@@ -1,11 +1,30 @@
 <div align="center">
-  <a href="https://github.com/filippofinke/sideloop">
+  <a href="https://github.com/ErikSeiter/sideloop-nas">
     <img width="140px" src=".github/logo.png" alt="Sideloop" />
   </a>
-  <h3 align="center">Sideloop</h3>
+  <h3 align="center">Sideloop for NAS (fixed for Apple's Oct 2026 sign-in)</h3>
 </div>
 
 > Keep sideloaded IPAs signed with a free Apple ID, re-installed over Wi-Fi before the 7-day signature expires.
+
+This is a fork of [filippofinke/sideloop](https://github.com/filippofinke/sideloop) (MIT) that **signs in again after Apple's October 2026 changes** and comes with a step-by-step guide for running it on a **NAS** (written and tested on a UGREEN DXP4800 running UGOS Pro).
+
+| Guide | |
+| --- | --- |
+| [UGREEN NAS (UGOS Pro) setup guide](docs/UGOS-NAS-GUIDE.md) | From an empty Docker app to an installed app on your iPhone |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Every Apple / AltServer error we hit, with the fix |
+
+### What is different from upstream
+
+| Problem | Upstream | This fork |
+| --- | --- | --- |
+| Apple sign-in fails with `-22411`, `-80045`, `-80046` | Builds the September AltServer tag | Builds AltServer tag `ng-2026-11-05`, which provisions its own anisette identity per install |
+| Anisette server | Local `dadoum/anisette-v3-server` container | A public v3 server by default (`ANISETTE_SERVER`); the local one is an optional compose profile |
+| Install fails with `Failed to set app extension placeholders` | Only warns that extensions use extra App IDs | **Remove App Extensions** switch when you add an IPA (on by default); the original is kept as `app.orig.ipa` |
+| "Sign-in helper isn't running" with a public server | Any non-200 answer counts as down | Any HTTP answer counts as up |
+| NAS deployment | None | Single-file compose for UGOS Docker: [`nas/docker-compose.ugos.yml`](nas/docker-compose.ugos.yml) |
+
+Everything else, including the two AltServer patches, is upstream's.
 
 A small self-hosted service with a web UI for any Linux machine (amd64 or arm64) or a Mac. It re-signs your apps with [AltServer-Linux](https://github.com/jaakkopalvaila/AltServer-Linux) and installs them in place, so app data is kept. You don't need AltStore or SideStore on the device.
 
@@ -15,10 +34,11 @@ A small self-hosted service with a web UI for any Linux machine (amd64 or arm64)
 - [x] Automatic re-signing when a device comes online, before the signature expires
 - [x] Web UI for pairing, uploading IPAs, 2FA codes and live progress
 - [x] Checks each IPA for FairPlay encryption, tweaks and app extensions
-- [x] Self-hosted Apple sign-in via [anisette-v3-server](https://github.com/Dadoum/anisette-v3-server)
+- [x] Apple sign-in through any anisette v3 server: a public one, or your own [anisette-v3-server](https://github.com/Dadoum/anisette-v3-server)
+- [x] Optional removal of app extensions so free Apple IDs can install apps that have them
 - [x] Python standard library only, one Docker image for amd64 and arm64
 
-## Demo
+## Demo (upstream)
 
 https://github.com/user-attachments/assets/8c6b799d-b9e7-4a15-898d-d96a2af8e876
 
@@ -40,8 +60,8 @@ Prerequisites
 Run on Linux
 
 ```bash
-git clone https://github.com/filippofinke/sideloop.git
-cd sideloop
+git clone https://github.com/ErikSeiter/sideloop-nas.git
+cd sideloop-nas
 cp .env.example .env
 docker compose up -d
 ```
@@ -55,6 +75,8 @@ ssh pi@<host> 'cd sideloop && docker compose up -d --no-build'
 ```
 
 Open `http://<host>:8080` and set a password. Then pair a device over USB, add an IPA and enter your Apple ID.
+
+On a NAS with a Docker GUI (UGOS Pro, Synology, QNAP...) follow the [NAS guide](docs/UGOS-NAS-GUIDE.md) instead.
 
 Run on macOS
 
@@ -70,26 +92,29 @@ Pair the device in Finder and enable **Show this iPhone when on Wi-Fi**.
 ## Notes
 
 - Use the Apple ID's **regular password**. App-specific passwords don't work.
-- Apple asks for a **2FA code** on the first sign-in. After that, sign-ins are silent.
+- Apple asks for a **2FA code** on the first sign-in. Enter it in the web UI (the background re-signer can't answer it). After that, sign-ins are normally silent.
 - The device must be **unlocked and on the same Wi-Fi** while a re-sign runs.
 - A free account allows 3 apps per device and 10 App IDs per week. Each app extension needs its own App ID.
 - Trust the developer once in **Settings > General > VPN & Device Management**. Refreshes keep it trusted.
-- If Apple sign-in stops working, update `ALTSERVER_TAG` in the `Dockerfile`. AltServer is built from that tag with the patches in `altserver/`.
+- If Apple sign-in stops working, check for a newer tag at [jaakkopalvaila/AltServer-Linux](https://github.com/jaakkopalvaila/AltServer-Linux/tags) and update `ALTSERVER_TAG` in the `Dockerfile`. AltServer is built from that tag with the patches in `altserver/`. See [Troubleshooting](docs/TROUBLESHOOTING.md) for the error codes.
+- The anisette identity (a file that works like a password for this "device") is stored in `./data/xdg`. Don't share it.
 
 Data is stored in `./data`.
 
-## Author
+## Credits
 
-👤 **Filippo Finke**
+Sideloop is by **Filippo Finke**; AltServer-Linux is by [jaakkopalvaila](https://github.com/jaakkopalvaila/AltServer-Linux) (a fork of [NyaMisty](https://github.com/NyaMisty/AltServer-Linux)). This fork only adds the changes listed above.
+
+👤 **Filippo Finke** (upstream author)
 
 - Website: [https://filippofinke.ch](https://filippofinke.ch)
 - Twitter: [@filippofinke](https://twitter.com/filippofinke)
 - GitHub: [@filippofinke](https://github.com/filippofinke)
 - LinkedIn: [@filippofinke](https://linkedin.com/in/filippofinke)
 
-## Show your support
+## Support the upstream author
 
-Give a ⭐️ if this project helped you!
+Give [the original project](https://github.com/filippofinke/sideloop) a ⭐️ if this helped you!
 
 <a href="https://www.buymeacoffee.com/filippofinke">
   <img src="https://github.com/filippofinke/filippofinke/raw/main/images/buymeacoffe.png" alt="Buy Me A McFlurry">
