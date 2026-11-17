@@ -1,4 +1,7 @@
-ARG ALTSERVER_TAG=ng-2026-09-13
+# ng-2026-11-05 is the first tag that can sign in after Apple's October 2026 changes (it provisions its
+# own anisette identity through a /v3/provisioning_session server). Older tags fail with -22411,
+# -80045 or -80046. Both patches below apply cleanly to it.
+ARG ALTSERVER_TAG=ng-2026-11-05
 
 # AltServer is built from source with the patches in altserver/. Stock AltServer removes every
 # free provisioning profile on the device before installing, which makes iOS forget that the user

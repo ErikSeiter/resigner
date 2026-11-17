@@ -4,6 +4,7 @@ import socket
 import subprocess
 import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -85,6 +86,8 @@ def _anisette_up():
     try:
         urllib.request.urlopen(ANISETTE, timeout=3).read(64)
         return True
+    except urllib.error.HTTPError:
+        return True  # the server answered, just not with 200 (public servers often 404 on /)
     except Exception:
         return False
 

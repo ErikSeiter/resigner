@@ -1,8 +1,13 @@
 name: sideloop
 
+# Sign-in needs an "anisette" server. Since Apple's October 2026 changes AltServer provisions its own
+# identity through a v3 server and keeps it in ./data/xdg, so a public server is enough. Only the
+# provisioning handshake goes through it: your Apple ID and password never do.
+# To run your own instead:  ANISETTE_SERVER=http://127.0.0.1:6969 docker compose --profile local-anisette up -d
 
 services:
   anisette:
+    profiles: ["local-anisette"]
     image: dadoum/anisette-v3-server:latest
     container_name: sideloop-anisette
     restart: unless-stopped
@@ -16,12 +21,14 @@ services:
     image: sideloop
     container_name: sideloop
     restart: unless-stopped
-    depends_on: [anisette]
     network_mode: host
     privileged: true
     environment:
       MUX: builtin
-      ANISETTE_SERVER: http://127.0.0.1:6969
+      ANISETTE_SERVER: ${ANISETTE_SERVER:-https://new.ani.sidestore.io}
+      # Where AltServer keeps its anisette identity (<this>/AltServer/anisette-v3/<server>.json).
+      # In the data volume it survives rebuilds, and the watcher and a shell use the same one.
+      XDG_CONFIG_HOME: /data/xdg
       TZ: ${TZ:-UTC}
     volumes:
       - ./data:/data
