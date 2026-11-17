@@ -100,7 +100,16 @@ class App:
         if "error" in info:
             raise ValueError(info["error"])
         self.idle()
-        return {"id": store.add_app(PENDING_IPA, info, str(data.get("filename", "")))}
+        filename = str(data.get("filename", ""))
+        if data.get("strip_extensions") and info.get("extension_count"):
+            stripped = PENDING_IPA.with_suffix(".stripped")
+            ipa.strip_extensions(PENDING_IPA, stripped)
+            stripped_info = ipa.inspect(stripped)
+            if "error" in stripped_info:
+                stripped.unlink(missing_ok=True)
+                raise ValueError(stripped_info["error"])
+            return {"id": store.add_app(stripped, stripped_info, filename, original=PENDING_IPA)}
+        return {"id": store.add_app(PENDING_IPA, info, filename)}
 
     def remove_app(self, data):
         if str(data.get("id")) not in store.app_ids():

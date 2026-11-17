@@ -90,11 +90,15 @@ def app_view(app_id):
     }
 
 
-def add_app(src, info, filename):
+def add_app(src, info, filename, original=None):
     app_id = re.sub(r"[^A-Za-z0-9._-]", "_", info["bundle_id"])[:120] or "app"
     d = APPS / app_id
     (d / "state").mkdir(parents=True, exist_ok=True)
     os.replace(src, d / "app.ipa")
+    if original:
+        os.replace(original, d / "app.orig.ipa")
+    else:
+        (d / "app.orig.ipa").unlink(missing_ok=True)
     old = app_meta(app_id)
     write_env(d / "meta.env", {
         "BUNDLE_ID": info["bundle_id"],

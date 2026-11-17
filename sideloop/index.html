@@ -481,6 +481,7 @@ function settingsView() {
           ${trash("app:", a.id, a.name)}</div>`; }).join("")}
       ${pending ? `<div class="cell ind">${appIcon(pending.info, "xs")}<span class="k">${esc(pending.info.name)}<span class="sub">${esc(pending.info.version)} · ${esc(pending.filename)}</span></span></div>
         ${ipaWarnings(pending.info)}
+        ${+pending.info.extension_count ? `<div class="cell ind">${tile("var(--orange)", "apps-outline")}<label for="stripx" class="k">Remove App Extensions<span class="sub">Free Apple IDs often can't install them. Drops share sheet, widgets and notifications.</span></label>${sw("stripx", pending.strip)}</div>` : ""}
         <button class="cell action" id="useipa" style="font-weight:600">${replacing ? `Replace ${esc(replacing.name)}` : devs.length > 1 ? "Add to All Devices" : "Add App"}</button>
         <button class="cell action" id="dropipa" style="color:var(--red)">Cancel</button>`
       : `<div class="drop" id="drop">${ic("add-circle", 22)}<span class="k" id="progt">Add App…</span></div>
@@ -560,7 +561,8 @@ function wire() {
     act(() => kind === "dev:" ? api("/api/device/remove", {json:{device:key}}) : api("/api/app/remove", {json:{id:key}}), "Removed");
   });
   on("aidf", "onsubmit", e => { e.preventDefault(); act(async () => { await api("/api/appleid", {json:{apple_id:$("#aid").value, password:$("#apw").value}}); $("#apw").value = ""; }, "Saved"); });
-  on("useipa", "onclick", () => act(async () => { await api("/api/ipa/use", {json:{filename:pending.filename}}); pending = null; }, "App added"));
+  on("useipa", "onclick", () => act(async () => { await api("/api/ipa/use", {json:{filename:pending.filename, strip_extensions: !!pending.strip}}); pending = null; }, "App added"));
+  on("stripx", "onchange", e => { pending.strip = e.target.checked; });
   on("dropipa", "onclick", () => { pending = null; render(); });
   const drop = $("#drop"), file = $("#file");
   if (drop && file) {
@@ -582,7 +584,7 @@ function upload(f) {
   x.upload.onload = () => { txt.textContent = "Reading the app…"; };
   x.onload = () => {
     let r = {}; try { r = JSON.parse(x.responseText); } catch {}
-    if (x.status === 200) pending = {info: r.info, filename: f.name}; else toast(r.error || `Upload failed (${x.status})`);
+    if (x.status === 200) pending = {info: r.info, filename: f.name, strip: true}; else toast(r.error || `Upload failed (${x.status})`);
     render(); poll();
   };
   x.onerror = () => { toast("Upload failed"); render(); poll(); };

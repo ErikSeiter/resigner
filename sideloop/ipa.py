@@ -92,3 +92,24 @@ def cached(folder):
     info = inspect(ipa) | {"_mtime": mtime}
     cache.write_text(json.dumps(info))
     return info
+
+
+_EXTENSION_DIRS = re.compile(r"Payload/[^/]+\.app/(PlugIns|Extensions|Watch)/")
+
+
+def strip_extensions(src, dst):
+    """Copies an IPA without its app extensions (PlugIns, Extensions) and Apple Watch app.
+
+    iOS refuses to install an app with extensions that was signed by a free Apple ID
+    ("Failed to set app extension placeholders"). AltStore and Sideloadly strip them for the same
+    reason. Returns the names of the removed bundles.
+    """
+    removed = set()
+    with zipfile.ZipFile(src) as zin, zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            m = _EXTENSION_DIRS.match(item.filename)
+            if m:
+                removed.add(item.filename[m.end():].split("/", 1)[0] or m.group(1))
+                continue
+            zout.writestr(item, zin.read(item.filename))
+    return sorted(removed)
