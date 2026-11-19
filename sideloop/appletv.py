@@ -126,6 +126,17 @@ def locate(udid, timeout=SCAN_TIME):
     return None
 
 
+def groups_for_new_tv():
+    """The groups a new Apple TV belongs in without being asked: empty ones that only hold tvOS apps, which is
+    what a group made for Apple TVs looks like."""
+    out = []
+    for gid in store.group_ids():
+        apps = [a for a in store.app_ids() if gid in store.app_groups(a)]
+        if not store.group_devices(gid) and apps and all(store.app_platform(a) == "tvos" for a in apps):
+            out.append(gid)
+    return out
+
+
 def _stamp():
     return {f.name: f.stat().st_mtime_ns for f in PAIRING_DIR.glob("*.json")} if PAIRING_DIR.is_dir() else {}
 
@@ -153,8 +164,11 @@ def pair(job, ip, port):
     info = paired().get(udid, {})
     name = info.get("name") or "Apple TV"
     forget_unknown()
-    store.add_device(udid, name, kind="appletv")
+    groups = groups_for_new_tv() if udid not in store.device_ids() else []
+    store.add_device(udid, name, groups, kind="appletv")
     job.say(f"✓ Added {name}. Your tvOS apps will be installed on it.")
+    if groups:
+        job.say("It is in the group " + ", ".join(store.group_name(g) for g in groups) + " (change that under Settings > Groups).")
 
 
 def profile_info(path):

@@ -91,7 +91,7 @@ An Apple TV with **tvOS 17 or newer** can be kept signed the same way. It is pai
 1. The Apple TV and the NAS must be on the **same network and subnet**. The compose file already uses `network_mode: host`, which is what lets Sideloop find the TV.
 2. On the Apple TV: **Settings → Remotes and Devices → Remote App and Devices**. Leave it open; it shows a PIN when something asks to pair.
 3. In Sideloop: **Settings → Pair Apple TV…**, pick the TV in the list, then type the **PIN** from the TV screen when the page asks for it.
-4. **Add App…** with a tvOS `.ipa`. The page says *Apple TV app* and offers it only to Apple TVs.
+4. **Add App…** with a tvOS `.ipa`. The page says *Apple TV app* and offers it only to Apple TVs (it reads this from the app's binary, so a tvOS build that claims iOS in its Info.plist is still recognised). A new Apple TV joins an empty group that only holds tvOS apps; otherwise change its groups under Settings → Groups.
 5. Press **Install**. The first sign-in with an Apple ID on the Apple TV needs a 2FA code in the web page, even if that Apple ID already works for your iPhone. After that the Apple TV is re-signed by itself while it is on and awake on the network.
 
 **Good to know:** the free limits (3 apps per device, 10 App IDs a week) apply to the Apple TV too. A tvOS update can drop the pairing, so pair again if the TV stops showing up as *Connected*. Turning off *Automatically Update tvOS* (Settings → System → Software Updates) helps. If the page says the Apple TV helper isn't installed, the image was built without it (the download or its checksum check failed); redeploy the project to try again.

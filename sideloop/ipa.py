@@ -5,12 +5,18 @@ import struct
 import zipfile
 
 LC_ENCRYPTION_INFO = (0x21, 0x2C)
+LC_VERSION_MIN_IPHONEOS, LC_VERSION_MIN_TVOS, LC_BUILD_VERSION = 0x25, 0x2F, 0x32
+PLATFORMS = {2: "ios", 3: "tvos"}  # LC_BUILD_VERSION platform ids (the simulators don't count: they can't go on a device)
 CPU_ARM64 = 0x0100000C
 FAT_MAGIC = (0xCAFEBABE, 0xCAFEBABF)
 MACHO_MAGIC = (0xFEEDFACF, 0xFEEDFACE)
+CACHE_VERSION = 2  # bump it when inspect() learns something new, so cached answers are made again
 
 
-def _cryptid(z, member):
+def _macho(z, member):
+    """(cryptid, platform) of the arm64 part of a Mach-O file in the zip. cryptid is 1 when the binary is FairPlay
+    encrypted and 0 when it isn't; platform is "tvos" or "ios" when the binary says what it was built for, else None.
+    (None, None) when it is no Mach-O file."""
     with z.open(member) as f:
         head = f.read(4096)
         base = 0
@@ -27,23 +33,37 @@ def _cryptid(z, member):
             head = f.read(4096)
         magic = struct.unpack("<I", head[:4])[0]
         if magic not in MACHO_MAGIC:
-            return None
+            return None, None
         hsize = 32 if magic == 0xFEEDFACF else 28
         ncmds, sizeofcmds = struct.unpack("<II", head[16:24])
         if hsize + sizeofcmds > len(head):
             f.seek(base)
             head = f.read(hsize + sizeofcmds)
-        off = hsize
+        cryptid, platform, off = 0, None, hsize
         for _ in range(ncmds):
             cmd, size = struct.unpack("<II", head[off:off + 8])
             if cmd in LC_ENCRYPTION_INFO:
-                return struct.unpack("<I", head[off + 16:off + 20])[0]
+                cryptid = struct.unpack("<I", head[off + 16:off + 20])[0]
+            elif cmd == LC_BUILD_VERSION:
+                platform = PLATFORMS.get(struct.unpack("<I", head[off + 8:off + 12])[0], platform)
+            elif cmd == LC_VERSION_MIN_TVOS:
+                platform = "tvos"
+            elif cmd == LC_VERSION_MIN_IPHONEOS:
+                platform = platform or "ios"
+            if size < 8:
+                break
             off += size
-        return 0
+        return cryptid, platform
 
 
-def platform_of(info):
-    """"tvos" for an Apple TV app, otherwise "ios" (iPhone and iPad apps, and anything unclear)."""
+def platform_of(info, binary=None):
+    """"tvos" for an Apple TV app, otherwise "ios" (iPhone and iPad apps, and anything unclear).
+
+    What the executable was built for (`binary`, from its Mach-O header) is the truth. Some tvOS builds are
+    published with an Info.plist that says iOS so that sideloaders which only know iOS accept them, so the plist
+    is only looked at when the binary can't be read."""
+    if binary in ("tvos", "ios"):
+        return binary
     platforms = [str(x).lower() for x in info.get("CFBundleSupportedPlatforms") or []]
     family = [int(x) for x in info.get("UIDeviceFamily") or [] if str(x).isdigit()]
     if "appletvos" in platforms or "appletvsimulator" in platforms or str(info.get("DTPlatformName", "")).lower() == "appletvos":
@@ -65,9 +85,9 @@ def inspect(path):
         p = plistlib.loads(z.read(info))
         exe = p.get("CFBundleExecutable", "")
         try:
-            enc = _cryptid(z, f"{app}/{exe}")
+            enc, binary = _macho(z, f"{app}/{exe}")
         except Exception:
-            enc = None
+            enc, binary = None, None
         tweaks = sorted({n.rsplit("/", 1)[1] for n in names if n.startswith(app + "/") and n.endswith(".dylib")})
         appex = sorted({m.group(1) for n in names
                         for m in [re.match(re.escape(app) + r"/PlugIns/([^/]+)\.appex/", n)] if m})
@@ -78,7 +98,7 @@ def inspect(path):
         "version": p.get("CFBundleShortVersionString", ""),
         "build": p.get("CFBundleVersion", ""),
         "min_ios": p.get("MinimumOSVersion", ""),
-        "platform": platform_of(p),
+        "platform": platform_of(p, binary),
         "size_mb": f"{size / 1e6:.0f}",
         "encrypted": {1: "yes", 0: "no"}.get(enc, "unknown"),
         "tweaks": ", ".join(tweaks),
@@ -95,11 +115,11 @@ def cached(folder):
     mtime = ipa.stat().st_mtime
     try:
         info = json.loads(cache.read_text())
-        if info.get("_mtime") == mtime:
+        if info.get("_mtime") == mtime and info.get("_v") == CACHE_VERSION:
             return info
     except (FileNotFoundError, ValueError):
         pass
-    info = inspect(ipa) | {"_mtime": mtime}
+    info = inspect(ipa) | {"_mtime": mtime, "_v": CACHE_VERSION}
     cache.write_text(json.dumps(info))
     return info
 

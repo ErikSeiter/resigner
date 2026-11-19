@@ -174,6 +174,25 @@ def sync_apps():
         sync_app(app_id)
 
 
+def migrate_platforms():
+    """An app added before its platform was read from the binary (or before Apple TV support) may be filed under
+    the wrong one. Looks at every IPA again and moves an app to the devices that fit it."""
+    for app_id in app_ids():
+        info = ipa.cached(APPS / app_id)
+        if not info or "error" in info:
+            continue
+        meta = app_meta(app_id)
+        platform = "tvos" if info.get("platform") == "tvos" else "ios"
+        if meta["APP_PLATFORM"] == platform:
+            continue
+        meta["APP_PLATFORM"] = platform
+        write_env(APPS / app_id / "meta.env", meta)
+        if app_groups(app_id):
+            sync_app(app_id)
+        else:  # not tied to a group: it follows every device that fits
+            set_app_devices(app_id, device_ids())
+
+
 def app_ids():
     if not APPS.is_dir():
         return []

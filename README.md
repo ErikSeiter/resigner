@@ -100,7 +100,7 @@ An Apple TV with tvOS 17 or newer is not reached like an iPhone: it has no USB o
 1. Put the Apple TV and the machine running Sideloop on the **same network** (same subnet, no guest Wi-Fi, no client isolation). Sideloop has to run with `network_mode: host`, as in the compose files.
 2. On the Apple TV open **Settings > Remotes and Devices > Remote App and Devices**. It waits there and shows a PIN when something asks to pair.
 3. In Sideloop open **Settings**, press **Pair Apple TV…**, choose the TV in the list and type the PIN it shows when the page asks for it.
-4. Add a **tvOS** `.ipa` the usual way. Sideloop recognises it, shows *Apple TV app* and only offers it to Apple TVs; iPhone apps are never offered to an Apple TV.
+4. Add a **tvOS** `.ipa` the usual way. Sideloop reads what the app's binary was built for (some tvOS builds claim iOS in their Info.plist), shows *Apple TV app* and only offers it to Apple TVs; iPhone apps are never offered to an Apple TV. A new Apple TV joins an empty group that only holds tvOS apps; otherwise it gets the tvOS apps that aren't tied to a group.
 5. Press **Install** next to it. The first sign-in of an Apple ID for the Apple TV needs a 2FA code, entered on the web page (a free Apple ID is signed in separately for iOS and for tvOS, so an Apple ID that already works for your iPhone still asks once). After that the Apple TV is re-signed automatically when it is on and on the network.
 
 Limits and things to know:

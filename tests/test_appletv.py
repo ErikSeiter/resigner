@@ -55,6 +55,73 @@ class Platform(Fresh):
         self.assertEqual(ipa.platform_of({}), "ios")
 
 
+class FromTheBinary(Fresh):
+    """Some tvOS builds claim iOS in their Info.plist (so that iOS-only sideloaders take them): the binary decides."""
+
+    def inspect(self, **kw):
+        path = Path(tempfile.mkdtemp()) / "a.ipa"
+        make_ipa(path, **kw)
+        return ipa.inspect(path)
+
+    def test_a_tvos_binary_in_an_ios_looking_ipa_is_a_tvos_app(self):
+        self.assertEqual(self.inspect(platform="ios", binary="tvos")["platform"], "tvos")
+
+    def test_the_older_load_command_is_read_too(self):
+        self.assertEqual(self.inspect(platform="ios", binary="tvos", via="min")["platform"], "tvos")
+        self.assertEqual(self.inspect(platform="tvos", binary="ios", via="min")["platform"], "ios")
+
+    def test_the_binary_wins_over_the_plist(self):
+        self.assertEqual(self.inspect(platform="tvos", binary="ios")["platform"], "ios")
+
+    def test_a_binary_that_says_nothing_leaves_it_to_the_plist(self):
+        self.assertEqual(self.inspect(platform="tvos")["platform"], "tvos")
+        self.assertEqual(self.inspect(platform="ios")["platform"], "ios")
+
+    def test_encryption_is_still_found(self):
+        self.assertEqual(self.inspect(binary="tvos")["encrypted"], "no")
+
+    def test_an_old_cached_answer_is_looked_at_again(self):
+        import json
+        app_id = self.app("com.example.tv", "TV App", platform="ios", binary="tvos")
+        folder = Path(store.APPS) / app_id
+        info = ipa.cached(folder)
+        self.assertEqual(info["platform"], "tvos")
+        cache = folder / "info.json"
+        stale = {**json.loads(cache.read_text()), "platform": "ios", "_v": 1}
+        cache.write_text(json.dumps(stale))
+        self.assertEqual(ipa.cached(folder)["platform"], "tvos")
+
+    def test_an_app_filed_under_the_wrong_platform_is_moved_to_the_devices_that_fit(self):
+        phone, tv = self.device(), self.tv()
+        app_id = self.app("com.example.tv", "TV App", platform="ios", binary="tvos")
+        self.assertEqual(store.app_devices(app_id), [tv])
+        meta = store.app_meta(app_id)  # as it was filed before the binary was read
+        meta["APP_PLATFORM"], meta["DEVICES"] = "ios", phone
+        store.write_env(Path(store.APPS) / app_id / "meta.env", meta)
+        self.assertEqual(store.app_devices(app_id), [phone])
+        store.migrate_platforms()
+        self.assertEqual(store.app_view(app_id)["platform"], "tvos")
+        self.assertEqual(store.app_devices(app_id), [tv])
+
+    def test_an_app_that_follows_a_group_is_synced_after_the_move(self):
+        tv = self.tv()
+        gid = store.add_group("AppleTV")
+        store.set_group_devices(gid, [tv])
+        app_id = self.app("com.example.tv", "TV App", platform="ios", binary="tvos")
+        store.set_app_groups(app_id, [gid])
+        meta = store.app_meta(app_id)
+        meta["APP_PLATFORM"] = "ios"
+        store.write_env(Path(store.APPS) / app_id / "meta.env", meta)
+        store.migrate_platforms()
+        self.assertEqual(store.app_devices(app_id), [tv])
+
+    def test_a_right_platform_is_left_alone(self):
+        phone = self.device()
+        app_id = self.app("com.example.ios", "Phone App", platform="ios", binary="ios")
+        store.migrate_platforms()
+        self.assertEqual(store.app_devices(app_id), [phone])
+
+
 class Compatibility(Fresh):
     def test_a_tv_only_takes_tvos_apps_and_the_other_devices_only_ios_apps(self):
         phone, tv = self.device(), self.tv()
@@ -223,6 +290,33 @@ class Pairing(WithStub):
         self.run_pair("1234")
         self.assertEqual(store.app_devices(tvos), [TV_UDID])
         self.assertEqual(store.app_devices(ios), [])
+
+    def test_a_new_tv_joins_an_empty_group_that_only_holds_tvos_apps(self):
+        gid = store.add_group("AppleTV")
+        tvos = self.app("com.example.tv", "TV App", platform="tvos")
+        store.set_app_groups(tvos, [gid])
+        self.assertEqual(store.app_devices(tvos), [])
+        job, _ = self.run_pair("1234")
+        self.assertEqual(store.group_devices(gid), [TV_UDID])
+        self.assertEqual(store.app_devices(tvos), [TV_UDID])
+        self.assertIn("in the group AppleTV", "\n".join(job.lines))
+
+    def test_a_new_tv_stays_out_of_groups_that_are_not_for_it(self):
+        mixed = store.add_group("Everything")
+        used = store.add_group("Phones")
+        store.set_group_devices(used, [self.device()])
+        for gid, bundle, platform in ((mixed, "com.example.tv", "tvos"), (mixed, "com.example.ios", "ios"), (used, "com.example.p", "ios")):
+            store.set_app_groups(self.app(bundle, bundle, platform=platform), [gid])
+        self.run_pair("1234")
+        self.assertEqual(store.group_devices(mixed), [])
+        self.assertEqual(store.group_devices(used), [UDID])
+
+    def test_pairing_an_already_known_tv_again_leaves_the_groups_alone(self):
+        gid = store.add_group("AppleTV")
+        store.set_app_groups(self.app("com.example.tv", "TV App", platform="tvos"), [gid])
+        self.tv()
+        self.run_pair("1234")
+        self.assertEqual(store.group_devices(gid), [])
 
     def test_a_bad_address_is_refused_before_anything_runs(self):
         job = Job("pairtv", "x")

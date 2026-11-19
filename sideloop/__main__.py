@@ -1,6 +1,6 @@
 import threading
 
-from . import accounts
+from . import accounts, store
 from .config import DATA, MUX, PORT, STATE
 from .devices import Health, Muxers
 from .jobs import Jobs
@@ -12,6 +12,7 @@ from .watcher import Watcher
 def main():
     STATE.mkdir(parents=True, exist_ok=True)
     accounts.migrate()
+    store.migrate_platforms()
     muxers = Muxers() if MUX == "builtin" else None
     health = Health()
     jobs = Jobs(on_done=health.scan_async)
