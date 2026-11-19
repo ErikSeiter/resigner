@@ -26,7 +26,7 @@ services:
         FROM alpine:3.20 AS repo
         RUN apk add --no-cache git \
          && git clone -q https://github.com/ErikSeiter/sideloop-nas.git /repo \
-         && cd /repo && git checkout -q e3d76d8e458773a6df0626dd7ca29b3abdfd1afe
+         && cd /repo && git checkout -q 3744223fb173c703670716282a6df345ced53772
 
         # --- 2. build AltServer from the tag that can sign in after Apple's Oct 2026 change --
         FROM ghcr.io/nyamisty/altserver_builder_alpine_amd64 AS altserver
