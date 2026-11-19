@@ -73,6 +73,9 @@ button.cell:active:not(:disabled){background:var(--fill-3)}
 .approw .nm{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .approw .st{font-size:15px;color:var(--label-2);margin-top:1px;overflow-wrap:anywhere}
 .st.warn{color:var(--orange)} .st.bad{color:var(--red)}
+.st .who{color:var(--label-2)}
+.st .who::before{content:" · "}
+@media (max-width:520px){.st .who{display:block;font-size:13px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.st .who::before{content:none}}
 .meter{position:relative;height:4px;border-radius:2px;background:var(--fill);margin-top:8px;max-width:300px}
 .meter>i{position:absolute;inset:0 auto 0 0;border-radius:2px;background:var(--green)}
 .meter.warn>i{background:var(--orange)} .meter.bad>i{background:var(--red)}
@@ -99,8 +102,9 @@ button.cell:active:not(:disabled){background:var(--fill-3)}
 .cell input.fi,.cell select.fi{flex:1.4;min-width:0;border:0;background:none;text-align:right;color:var(--label-2);padding:0;outline:none;font-size:17px}
 .cell input.fi:focus{color:var(--label)}
 .cell input.fi::placeholder{color:var(--label-3)}
-.cell select.fi{appearance:none;-webkit-appearance:none;cursor:pointer;text-align-last:right}
+.cell select.fi{flex:0 1 auto;appearance:none;-webkit-appearance:none;cursor:pointer;text-align-last:right}
 .cell label{flex:none}
+.cell label.k{flex:1;white-space:nowrap}
 
 .drop{position:relative;display:flex;align-items:center;gap:12px;padding:10px 16px;min-height:44px;cursor:pointer;color:var(--blue)}
 .drop.over{background:var(--fill-3)}
@@ -155,10 +159,16 @@ button.cell:active:not(:disabled){background:var(--fill-3)}
 .steps .dot::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--label-3)}
 .list+.list{margin-top:14px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
-.chip{border:0;border-radius:999px;padding:4px 10px;font-size:13px;font-weight:500;cursor:pointer;background:var(--fill-3);color:var(--label-2);display:inline-flex;align-items:center;gap:4px;letter-spacing:-.005em}
+.chip{border:0;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:500;cursor:pointer;background:var(--fill-3);color:var(--label-2);display:inline-flex;align-items:center;gap:4px;letter-spacing:-.005em}
 .chip.on{background:color-mix(in srgb,var(--blue) 16%,transparent);color:var(--blue)}
 .appcell{align-items:flex-start}
 .i.up{transform:rotate(-90deg)} .i.down{transform:rotate(90deg)}
+.k>.hd{display:block}
+.ptools>.tools{position:absolute;top:12px;right:16px}
+.ptools>.k>.hd{padding-right:104px}
+.mv{display:flex;align-items:center;gap:6px}
+.nm1{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:520px){.idrow{flex-wrap:wrap;row-gap:4px}.idrow>.k{flex:1 1 calc(100% - 50px)}.idrow>.tools{flex:1 1 100%;justify-content:flex-end;padding-left:42px;gap:12px}.idrow .mv{margin-right:auto}}
 .iconbtn:disabled{opacity:.25;cursor:default}
 .iconbtn.blue{color:var(--blue)}
 .tools{display:flex;align-items:center;gap:14px;flex:none}
@@ -175,9 +185,32 @@ button.cell:active:not(:disabled){background:var(--fill-3)}
 .auth .err{color:var(--red);font-size:13px;margin:8px 16px 0;text-align:left}
 .auth .btn{margin-top:18px}
 
-.logs{margin:0;padding:14px 16px;font-family:var(--mono);font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:calc(100vh - 230px);overflow:auto;letter-spacing:0;color:var(--label-2)}
+.logs{margin:0;padding:0;max-height:calc(100vh - 230px);overflow:auto}
+.ll{position:relative;padding:10px 16px 10px 34px}
+.ll+.ll::before{content:"";position:absolute;top:0;right:0;left:34px;height:.5px;background:var(--sep)}
+.ll::after{content:"";position:absolute;left:16px;top:15px;width:8px;height:8px;border-radius:50%;background:var(--gray)}
+.ll.ok::after{background:var(--green)} .ll.warn::after{background:var(--orange)} .ll.bad::after{background:var(--red)}
+.ll .lt{font-size:12px;color:var(--label-2);font-variant-numeric:tabular-nums;letter-spacing:0}
+.ll .lw{font-weight:600}
+.ll .lm{font-size:15px;line-height:1.35;overflow-wrap:anywhere}
+.ll .lm code{font-family:var(--mono);font-size:12px;letter-spacing:0;color:var(--label-2)}
+.logs .none{padding:16px;color:var(--label-2)}
 .empty{text-align:center;padding:36px 20px;color:var(--label-2);font-size:15px}
 .empty b{display:block;font-size:20px;color:var(--label);margin:14px 0 6px}
+
+@media (hover:hover){
+  button.cell:hover:not(:disabled),.drop:hover{background:var(--fill-3)}
+  .cap:hover:not(:disabled){filter:brightness(.93)}
+  .cap.solid:hover:not(:disabled){filter:brightness(1.1)}
+  .chip:hover,.iconbtn:hover:not(:disabled){filter:brightness(.92)}
+  .linkbtn:hover:not(:disabled),.navbtn:hover,.tabbar button:hover{opacity:.7}
+  .btn:hover{filter:brightness(1.08)}
+}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.cell:focus-visible,.drop:focus-visible{outline-offset:-2px}
+.switch input:focus-visible+span{box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 45%,transparent)}
+.cell input.fi:focus-visible,.code:focus-visible{outline:0}
+@media (prefers-reduced-motion:reduce){*:not(.spinner),*:not(.spinner)::before,*:not(.spinner)::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
@@ -349,7 +382,7 @@ function appsView() {
         const pct = t.signature.expiry ? Math.max(0, Math.min(100, s.left / life * 100)) : 0;
         return `<div class="approw">${appIcon(a, "md")}
           <div class="mid"><div class="nm">${esc(a.name)}</div>
-            <div class="st ${failed ? "bad" : s.cls}">${failed ? "Last re-sign failed" : s.text}${(S.accounts || []).length > 1 && t.signature.account && accName(t.signature.account) ? ` · ${esc(accName(t.signature.account))}` : ""}</div>
+            <div class="st ${failed ? "bad" : s.cls}">${failed ? "Last re-sign failed" : s.text}${(S.accounts || []).length > 1 && t.signature.account && accName(t.signature.account) ? `<span class="who">${esc(accName(t.signature.account))}</span>` : ""}</div>
             ${t.signature.expiry ? `<div class="meter ${s.cls}"><i style="width:${pct}%"></i></div>` : ""}</div>
           <button class="cap ${s.cls === "ok" ? "" : "solid"}" data-sign="${esc(a.id)}" data-dev="${esc(d.udid)}" ${busy ? "disabled" : ""}>${t.signature.expiry ? "Re-sign" : "Install"}</button></div>`;
       }).join("") || `<div class="cell"><span class="k" style="color:var(--label-2)">No apps on this device</span><button class="linkbtn" data-go="settings">Choose</button></div>`}</div>
@@ -499,7 +532,7 @@ function settingsView() {
     <div class="shead"><h3>Groups</h3></div>
     <div class="list">
       ${groups.map(g => { const on = new Set(g.devices.map(u => u.toLowerCase())), n = apps.filter(a => (a.groups || []).includes(g.id)).length;
-        return `<div class="cell ind appcell">${tile("var(--blue)", "apps-outline")}<span class="k">${esc(g.name)}<span class="sub">${plural(g.devices.length, "device")} · ${plural(n, "app")}</span>
+        return `<div class="cell ind appcell ptools">${tile("var(--blue)", "apps-outline")}<span class="k"><span class="hd">${esc(g.name)}<span class="sub">${plural(g.devices.length, "device")} · ${plural(n, "app")}</span></span>
           <span class="chips">${devs.map(d => `<button class="chip ${on.has(d.udid.toLowerCase()) ? "on" : ""}" data-gdev="${esc(g.id)}" data-dev="${esc(d.udid)}">${on.has(d.udid.toLowerCase()) ? check : ""}${esc(d.name)}</button>`).join("") || `<span class="sub">Add a device first</span>`}</span></span>
           <span class="tools"><button class="linkbtn" data-rename="${esc(g.id)}">Rename</button>${trash("grp:", g.id, g.name)}</span></div>`; }).join("")}
       <form id="gaddf" class="cell"><input class="fi" id="gname" style="text-align:left;color:var(--label)" placeholder="New group, e.g. Family iPads" maxlength="40"><button class="cap solid">Add</button></form>
@@ -523,7 +556,7 @@ function settingsView() {
           <span class="sub" style="margin-top:7px">${pending.groups.length ? "Only the devices of these groups." : "Pick groups, or none for every device."}</span></span></div>` : ""}
         <button class="cell action" id="useipa" style="font-weight:600">${replacing ? `Replace ${esc(replacing.name)}` : pending.groups.length ? "Add to Selected Groups" : devs.filter(d => fitsApp(pending.info, d)).length > 1 ? "Add to All Devices" : "Add App"}</button>
         <button class="cell action" id="dropipa" style="color:var(--red)">Cancel</button>`
-      : `<div class="drop" id="drop">${ic("add-circle", 22)}<span class="k" id="progt">Add App…</span></div>
+      : `<div class="drop" id="drop" role="button" tabindex="0">${ic("add-circle", 22)}<span class="k" id="progt">Add App…</span></div>
          <div class="progress hidden" id="prog"><i></i></div>
          <input type="file" id="file" accept=".ipa" class="hidden">
          <form id="linkf" class="cell"><input class="fi" id="ipalink" style="text-align:left;color:var(--label)" placeholder="Or paste a link to an .ipa" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false"><button class="cap solid">Get</button></form>`}
@@ -534,11 +567,11 @@ function settingsView() {
   <div class="sect">
     <div class="shead"><h3>Apple IDs</h3></div>
     <div class="list">
-      ${accs.map((a, i) => `<div class="cell ind appcell">${tile(a.enabled ? "var(--green)" : "var(--gray)", "lock-closed")}<span class="k">${esc(a.apple_id)}
+      ${accs.map((a, i) => `<div class="cell ind appcell idrow">${tile(a.enabled ? "var(--green)" : "var(--gray)", "lock-closed")}<span class="k"><span class="nm1">${esc(a.apple_id)}</span>
           <span class="sub">${[i === 0 && a.enabled ? "First choice" : "", !a.verified ? "Not used yet" : a.exhausted ? "Out of signings for now" : a.per_device ? `${a.per_device} of 3 apps per device` : "No apps yet", a.app_ids_week ? `${a.app_ids_week} of 10 App IDs this week` : ""].filter(Boolean).join(" · ")}</span></span>
-          <span class="tools">
+          <span class="tools"><span class="mv">
             <button class="iconbtn blue" data-mv="up" data-acc="${esc(a.id)}" aria-label="Move up" ${i === 0 ? "disabled" : ""}>${ic("chevron-forward", 18, "up")}</button>
-            <button class="iconbtn blue" data-mv="down" data-acc="${esc(a.id)}" aria-label="Move down" ${i === accs.length - 1 ? "disabled" : ""}>${ic("chevron-forward", 18, "down")}</button>
+            <button class="iconbtn blue" data-mv="down" data-acc="${esc(a.id)}" aria-label="Move down" ${i === accs.length - 1 ? "disabled" : ""}>${ic("chevron-forward", 18, "down")}</button></span>
             ${sw("accon-" + a.id, a.enabled)}${trash("acc:", a.id, a.apple_id)}</span></div>`).join("")}
     </div>
     <form id="aidf" autocomplete="off"><div class="list" style="margin-top:14px">
@@ -573,13 +606,22 @@ function ipaWarnings(i) {
 function activityView() {
   return `<div class="sect">
     <div class="shead"><h3>History</h3><button class="linkbtn" id="reload">${ic("refresh", 15)}Reload</button></div>
-    <div class="list"><pre class="logs" id="logs">Loading…</pre></div></div>`;
+    <div class="list"><div class="logs" id="logs"><div class="none">Loading…</div></div></div></div>`;
+}
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function logRow(line) {
+  const m = /^(\d{4})-(\d\d)-(\d\d) (\d\d:\d\d)(?::\d\d)? (?:\[([^\]]+)\] )?([\s\S]*)$/.exec(line);
+  if (!m) return `<div class="ll"><div class="lm">${esc(line)}</div></div>`;
+  const [, , mo, d, hm, who, msg] = m;
+  const cls = /^OK\b|Installation complete/.test(msg) ? "ok" : /^(FAIL|ERROR)\b/.test(msg) ? "bad" : /^(WARNING|NOTE)\b|not reachable|no signings left|failed/.test(msg) ? "warn" : "";
+  const text = esc(msg).replace(/\b[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16}\b/g, id => `<code>${id}</code>`);
+  return `<div class="ll ${cls}"><div class="lt">${+d} ${MONTHS[+mo - 1]} · ${hm}</div><div class="lm">${who ? `<span class="lw">${esc(who)}</span> ` : ""}${text}</div></div>`;
 }
 async function loadLogs() {
   const r = await api("/api/logs");
   const el = $("#logs"); if (!el) return;
-  el.textContent = r.lines.length ? r.lines.join("\n") : "Nothing yet.";
-  el.scrollTop = el.scrollHeight;
+  el.innerHTML = r.lines.length ? r.lines.slice().reverse().map(logRow).join("") : `<div class="none">Nothing yet.</div>`;
+  el.scrollTop = 0;
 }
 
 async function act(fn, ok) { try { await fn(); if (ok) toast(ok); } catch (e) { toast(e.message); } await poll(); }
@@ -659,6 +701,7 @@ function wire() {
   const drop = $("#drop"), file = $("#file");
   if (drop && file) {
     drop.onclick = () => file.click();
+    drop.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } };
     file.onchange = () => file.files[0] && upload(file.files[0]);
     drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
     drop.ondragleave = () => drop.classList.remove("over");
