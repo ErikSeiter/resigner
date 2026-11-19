@@ -525,7 +525,8 @@ function settingsView() {
         <button class="cell action" id="dropipa" style="color:var(--red)">Cancel</button>`
       : `<div class="drop" id="drop">${ic("add-circle", 22)}<span class="k" id="progt">Add App…</span></div>
          <div class="progress hidden" id="prog"><i></i></div>
-         <input type="file" id="file" accept=".ipa" class="hidden">`}
+         <input type="file" id="file" accept=".ipa" class="hidden">
+         <form id="linkf" class="cell"><input class="fi" id="ipalink" style="text-align:left;color:var(--label)" placeholder="Or paste a link to an .ipa" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false"><button class="cap solid">Get</button></form>`}
     </div>
     <div class="foot">A free Apple ID allows 3 apps per device and 10 App IDs a week${apps.length ? ` (these use ${appIds}; the same app on more devices costs nothing extra)` : ""}.</div>
   </div>
@@ -653,6 +654,8 @@ function wire() {
   on("useipa", "onclick", () => act(async () => { await api("/api/ipa/use", {json:{filename:pending.filename, strip_extensions: !!pending.strip, groups: pending.groups}}); pending = null; }, "App added"));
   on("stripx", "onchange", e => { pending.strip = e.target.checked; });
   on("dropipa", "onclick", () => { pending = null; render(); });
+  const linkf = $("#linkf");
+  if (linkf) linkf.onsubmit = e => { e.preventDefault(); const u = $("#ipalink").value.trim(); if (u) fetchLink(u); };
   const drop = $("#drop"), file = $("#file");
   if (drop && file) {
     drop.onclick = () => file.click();
@@ -661,6 +664,16 @@ function wire() {
     drop.ondragleave = () => drop.classList.remove("over");
     drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) upload(f); };
   }
+}
+async function fetchLink(url) {
+  clearTimeout(pollT); pollGen++;
+  const go = $("#linkf button"), field = $("#ipalink");
+  go.disabled = field.disabled = true; go.textContent = "Getting…";
+  try {
+    const r = await api("/api/ipa/fetch", {json: {url}});
+    pending = {info: r.info, filename: r.filename, strip: true, groups: []};
+  } catch (e) { toast(e.message); }
+  render(); poll();
 }
 function upload(f) {
   if (!/\.ipa$/i.test(f.name)) return toast("That's not an .ipa file");

@@ -6,7 +6,7 @@ import time
 import urllib.parse
 from pathlib import Path
 
-from . import accounts, anisette, appletv, auth, config, ipa, pairing, store
+from . import accounts, anisette, appletv, auth, config, download, ipa, pairing, store
 from .config import LIFETIME_DAYS, MUX, PENDING_IPA, STATE
 from .jobs import redact, run_capture, run_pty
 from .watcher import configured
@@ -156,6 +156,15 @@ class App:
             store.set_app_groups(app_id, [g for g in data["groups"] if g in store.group_ids()])
         return {"id": app_id}
 
+    def fetch_ipa(self, data):
+        PENDING_IPA.parent.mkdir(parents=True, exist_ok=True)
+        filename, digest = download.fetch(str(data.get("url", "")), PENDING_IPA, MAX_IPA, str(data.get("sha256", "")))
+        info = ipa.inspect(PENDING_IPA)
+        if "error" in info:
+            PENDING_IPA.unlink(missing_ok=True)
+            raise ValueError(info["error"])
+        return {"info": info, "filename": filename, "sha256": digest}
+
     def remove_app(self, data):
         if str(data.get("id")) not in store.app_ids():
             raise ValueError("no such app")
@@ -285,6 +294,7 @@ class App:
             "/api/device/remove": self.remove_device,
             "/api/app/devices": self.set_app_devices,
             "/api/app/remove": self.remove_app,
+            "/api/ipa/fetch": self.fetch_ipa,
             "/api/ipa/use": self.use_ipa,
             "/api/appleid": self.account_save,
             "/api/account/save": self.account_save,

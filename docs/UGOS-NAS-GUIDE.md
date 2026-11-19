@@ -60,7 +60,7 @@ Settings → Groups lets you make sets of devices, for example *Family iPads*. T
 
 ## 6. Add an IPA
 
-Press **Add App…** and choose the `.ipa`. Sideloop shows what it found (encryption, tweaks, extensions).
+Press **Add App…** and choose the `.ipa`, or paste a link to one under it and press **Get**: the NAS downloads the file itself (handy for GitHub releases and vendor downloads, and for files that are large to upload). Sideloop shows what it found (encryption, tweaks, extensions).
 
 **Keep "Remove App Extensions" on** when it appears. Apps that contain extensions (share sheet, widgets, notification service, ...) are rejected by iOS when they are signed with a free Apple ID: the install runs to the end and then fails with `Failed to set app extension placeholders`. AltStore and Sideloadly strip extensions for the same reason. The cost is that those extra features are gone; the app itself works. The untouched file is kept as `app.orig.ipa` next to the signed one.
 

@@ -33,7 +33,7 @@ A small self-hosted service with a web UI for any Linux machine (amd64 or arm64)
 
 - [x] Multiple apps on multiple iPhones and iPads
 - [x] Automatic re-signing when a device comes online, before the signature expires
-- [x] Web UI for pairing, uploading IPAs, 2FA codes and live progress
+- [x] Web UI for pairing, adding IPAs (upload or paste a link), 2FA codes and live progress
 - [x] Checks each IPA for FairPlay encryption, tweaks and app extensions
 - [x] Apple sign-in through any anisette v3 server: public ones, or your own [anisette-v3-server](https://github.com/Dadoum/anisette-v3-server). `ANISETTE_SERVER` can list several; a failing server is set aside for 15 minutes and the next one is used
 - [x] Optional removal of app extensions so free Apple IDs can install apps that have them
