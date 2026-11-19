@@ -26,6 +26,21 @@ Where to look first: the **Activity** tab in the web UI, or `data/state/refresh.
 | *"The Apple sign-in helper isn't running"* in the UI | The anisette server can't be reached | Check internet access from the NAS and `ANISETTE_SERVER`. This fork treats any HTTP answer (even 404) as "up" |
 | `no signature on record yet, doing the first install` right after you installed by hand | Sideloop doesn't know about an install you made from a shell | Press **Check Everything** in the web UI (or run `refresh.sh --recheck`) while the iPhone is **unlocked and on the home Wi-Fi**. It reads the profile from the iPhone and records the expiry, without contacting Apple. Until then the automatic re-signer keeps trying a "first install", so switch **Automatic** off first |
 
+## Apple TV
+
+Apple TV signing is a separate path from the iPhone one (plumesign instead of AltServer), so an Apple TV problem never stops an iPhone or iPad refresh.
+
+| You see | What it means | What to do |
+| --- | --- | --- |
+| *The Apple TV helper isn't installed in this image* (no **Pair Apple TV…** button) | The Docker build couldn't download plumesign or its SHA-256 didn't match, so it built the image without it on purpose | Redeploy the project (check the NAS can reach github.com). The build log says `plumesign installed` or `WARNING: plumesign could not be installed` |
+| **Pair Apple TV…** finds nothing | The TV isn't showing a PIN, or it isn't on the same network | Open Settings → Remotes and Devices → Remote App and Devices on the TV and look again. Same subnet, no guest network or client isolation; Sideloop needs `network_mode: host` |
+| Pairing fails after the PIN | Wrong PIN, or the PIN timed out | Press **Pair Apple TV…** again and use the PIN that is on the screen now |
+| The Apple TV shows *Away* | It is off, asleep, or Sideloop can't see it on the network (mDNS) | Wake it. Pairing can also be gone after a tvOS update: pair again. A re-sign waits until the TV is back |
+| `Account '…' not found`, `Authentication extra step required` in the log | The Apple ID's session for the Apple TV is missing or expired | Press **Install** on the app in the web page and enter the 2FA code; background runs can't |
+| *The first install on an Apple TV needs a verification code* | A sign-in for the iPhone doesn't count for the Apple TV | Same: start the install from the web page once |
+| `skipped: an Apple TV only takes tvOS apps` / `a tvOS app can't go on an iPhone or iPad` | An app of the other kind was pointed at the device | Harmless. Sideloop only offers each app to devices that fit it |
+| The Apple TV asks to trust the developer, or the app disappears after a week | The signature ran out, or another Apple ID signed it | Check that **Automatic** is on and that the TV was on and awake on the network during the last days; press **Re-sign** to do it now |
+
 ## Run AltServer by hand and see the real error
 
 The web UI hides most of AltServer's output. To see everything, open **Docker → Container → `sideloop` → Terminal → `/bin/bash`** and run (the UDID comes from `idevice_id -l`; replace `<bundle-id>`):

@@ -23,6 +23,7 @@ This is a fork of [filippofinke/sideloop](https://github.com/filippofinke/sidelo
 | Install fails with `Failed to set app extension placeholders` | Only warns that extensions use extra App IDs | **Remove App Extensions** switch when you add an IPA (on by default); the original is kept as `app.orig.ipa` |
 | "Sign-in helper isn't running" with a public server | Any non-200 answer counts as down | Any HTTP answer counts as up |
 | NAS deployment | None | Single-file compose for UGOS Docker: [`nas/docker-compose.ugos.yml`](nas/docker-compose.ugos.yml) |
+| Apple TV | iPhone and iPad only | **tvOS 17+ Apple TVs** are paired with a PIN from the web page and get tvOS apps signed and installed over Wi-Fi (see [Apple TV](#apple-tv)) |
 
 Everything else, including the two AltServer patches, is upstream's.
 
@@ -38,6 +39,7 @@ A small self-hosted service with a web UI for any Linux machine (amd64 or arm64)
 - [x] Optional removal of app extensions so free Apple IDs can install apps that have them
 - [x] **Groups** of devices: tie an app to a group (for example "Family iPads") and it only goes to that group's devices; a new device only gets the apps that aren't tied to a group
 - [x] **Several Apple IDs** in a priority order: a new app is signed with the first Apple ID that still has room and the next one takes over when Apple says the limit is reached. An installed app always stays with the Apple ID that signed it
+- [x] **Apple TV** (tvOS 17 and newer): pair it once with the PIN the TV shows, then tvOS apps are re-signed like the ones on your iPhone. iPhones and iPads keep using AltServer; the Apple TV path never touches them
 - [x] Python standard library only, one Docker image for amd64 and arm64
 
 ## Demo (upstream)
@@ -91,6 +93,25 @@ docker compose -f docker-compose.yml -f docker-compose.mac.yml up -d
 
 Pair the device in Finder and enable **Show this iPhone when on Wi-Fi**.
 
+## Apple TV
+
+An Apple TV with tvOS 17 or newer is not reached like an iPhone: it has no USB or lockdown service for this, it is paired once with a PIN and then found on the network. Sideloop uses [plumesign](https://github.com/bitxeno/PlumeImpactor) (MIT) for that part. The Docker image downloads a pinned release and checks its SHA-256; if that fails the image is still built, only without Apple TV support, and the web page says so.
+
+1. Put the Apple TV and the machine running Sideloop on the **same network** (same subnet, no guest Wi-Fi, no client isolation). Sideloop has to run with `network_mode: host`, as in the compose files.
+2. On the Apple TV open **Settings > Remotes and Devices > Remote App and Devices**. It waits there and shows a PIN when something asks to pair.
+3. In Sideloop open **Settings**, press **Pair Apple TV…**, choose the TV in the list and type the PIN it shows when the page asks for it.
+4. Add a **tvOS** `.ipa` the usual way. Sideloop recognises it, shows *Apple TV app* and only offers it to Apple TVs; iPhone apps are never offered to an Apple TV.
+5. Press **Install** next to it. The first sign-in of an Apple ID for the Apple TV needs a 2FA code, entered on the web page (a free Apple ID is signed in separately for iOS and for tvOS, so an Apple ID that already works for your iPhone still asks once). After that the Apple TV is re-signed automatically when it is on and on the network.
+
+Limits and things to know:
+
+- Only **tvOS 17 and newer**, and only apps built for tvOS. The same free-account limits apply (3 apps per device, 10 App IDs per week).
+- The Apple TV has to be **on and awake on the network** for a re-sign; if it isn't, Sideloop waits and tries again later.
+- A **tvOS update can drop the pairing**. Pair again from the web page if the TV stops being found.
+- Switching off *Automatically Update tvOS* (Settings > System > Software Updates) avoids surprises.
+- A different Apple ID is a different developer team, so an app stays with the Apple ID that signed it.
+- The pairing and the signed-in Apple ID sessions are kept in `data/xdg/PlumeImpactor` (treat it like a password).
+
 ## Notes
 
 - Use the Apple ID's **regular password**. App-specific passwords don't work.
@@ -111,11 +132,11 @@ Data is stored in `./data`.
 python3 -m unittest discover -s tests -t .
 ```
 
-The tests run `scripts/refresh.sh` against stand-ins for AltServer and the libimobiledevice tools (`tests/stubs/`), so they need `bash`, `openssl`, `flock` and `script` but no phone and no Apple ID.
+The tests run `scripts/refresh.sh` and `scripts/refresh-tv.sh` against stand-ins for AltServer, plumesign and the libimobiledevice tools (`tests/stubs/`), so they need `bash`, `openssl`, `flock` and `script` but no phone, no Apple TV and no Apple ID.
 
 ## Credits
 
-Sideloop is by **Filippo Finke**; AltServer-Linux is by [jaakkopalvaila](https://github.com/jaakkopalvaila/AltServer-Linux) (a fork of [NyaMisty](https://github.com/NyaMisty/AltServer-Linux)). This fork only adds the changes listed above.
+Sideloop is by **Filippo Finke**; AltServer-Linux is by [jaakkopalvaila](https://github.com/jaakkopalvaila/AltServer-Linux) (a fork of [NyaMisty](https://github.com/NyaMisty/AltServer-Linux)). Apple TV signing is done by `plumesign` from [PlumeImpactor](https://github.com/bitxeno/PlumeImpactor) (MIT). [atvloadly](https://github.com/bitxeno/atvloadly) (AGPL-3.0) showed how that tool is driven; none of its code is used here. This fork only adds the changes listed above.
 
 👤 **Filippo Finke** (upstream author)
 

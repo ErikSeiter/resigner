@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from . import anisette, store
+from . import anisette, appletv, store
 from .config import ANISETTE, LOCKDOWN_DIR, USB_MUX
 from .log import log
 
@@ -100,7 +100,7 @@ def _probe():
     for line in run_group(["probe.sh"], 60).splitlines():
         p = line.split("\t")
         if len(p) == 6:
-            devices.append({"udid": p[0], "conn": p[1], "reachable": p[2] == "yes",
+            devices.append({"udid": p[0], "conn": p[1], "reachable": p[2] == "yes", "kind": "ios",
                             "name": p[3], "model": p[4], "ios": p[5]})
     return devices
 
@@ -123,6 +123,10 @@ class Health:
         try:
             muxer, anisette = _mux_reachable(), _anisette_up()
             devices = _probe() if muxer else []
+            try:
+                devices += appletv.scan_live()  # Apple TVs aren't behind the muxer; they are found by Bonjour
+            except Exception as e:
+                log("Apple TV scan failed:", e)
             known = {u.lower(): u for u in store.device_ids()}
             here = {known[d["udid"].lower()] for d in devices if d["reachable"] and d["udid"].lower() in known}
             with self.lock:

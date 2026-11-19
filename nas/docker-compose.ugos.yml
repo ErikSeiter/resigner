@@ -11,7 +11,8 @@
 #      Leave the default unless the guide's troubleshooting page tells you otherwise.
 #
 # Raspberry Pi / ARM NAS: replace "amd64" with "aarch64" in the builder image and
-# "x86_64" with "aarch64" in the netmuxd URL.
+# "x86_64" with "aarch64" in the netmuxd URL and the plumesign URL. For Apple TV support on ARM, also replace the
+# plumesign checksum with baa4fe218aced4021f51470c00ac95c8e4ebfd2bdfa13f22c2a8ffa310288f59.
 name: sideloop
 
 services:
@@ -45,6 +46,15 @@ services:
         RUN curl -fsSL https://github.com/jkcoxson/netmuxd/releases/download/v0.4.3/netmuxd-x86_64-unknown-linux-gnu.tar.gz \
               | tar xz -C /usr/local/bin \
          && chmod +x /usr/local/bin/netmuxd
+        # plumesign (MIT) is what installs apps on an Apple TV. Pinned and checked against its SHA-256; if either
+        # fails the image is still built, without Apple TV support (iPhones and iPads are not affected).
+        RUN if curl -fsSL -o /tmp/plumesign.tgz https://github.com/bitxeno/PlumeImpactor/releases/download/v2.7.1-patch.11/plumesign-linux-x86_64.tar.gz \
+               && echo "91c82918449f4810bff96bc43be746b86db3f5236b505102d2ed7daa0f78f5b8  /tmp/plumesign.tgz" | sha256sum -c - \
+               && tar xzf /tmp/plumesign.tgz -C /tmp \
+               && install -m 0755 /tmp/plumesign-linux-x86_64 /usr/local/bin/plumesign; \
+            then echo "plumesign installed"; \
+            else echo "WARNING: plumesign could not be installed, Apple TV support is off"; fi; \
+            rm -f /tmp/plumesign.tgz /tmp/plumesign-linux-x86_64
         COPY --from=altserver /AltServer /usr/local/bin/AltServer
         COPY --from=repo /repo/scripts/ /usr/local/bin/
         COPY --from=repo /repo/sideloop/ /opt/sideloop/

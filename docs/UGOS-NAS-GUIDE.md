@@ -84,10 +84,22 @@ Leave **Automatic** on. Sideloop re-signs when less than the *Re-sign Early* tim
 
 While you are troubleshooting, **switch Automatic off**: every automatic attempt that reaches Apple can make your iPhone show an *Apple ID sign-in requested* prompt.
 
+## 10. Apple TV (optional)
+
+An Apple TV with **tvOS 17 or newer** can be kept signed the same way. It is paired differently from an iPhone (no cable, a PIN instead) and only takes **tvOS apps**; your iPhone and iPad apps are not touched by any of this.
+
+1. The Apple TV and the NAS must be on the **same network and subnet**. The compose file already uses `network_mode: host`, which is what lets Sideloop find the TV.
+2. On the Apple TV: **Settings → Remotes and Devices → Remote App and Devices**. Leave it open; it shows a PIN when something asks to pair.
+3. In Sideloop: **Settings → Pair Apple TV…**, pick the TV in the list, then type the **PIN** from the TV screen when the page asks for it.
+4. **Add App…** with a tvOS `.ipa`. The page says *Apple TV app* and offers it only to Apple TVs.
+5. Press **Install**. The first sign-in with an Apple ID on the Apple TV needs a 2FA code in the web page, even if that Apple ID already works for your iPhone. After that the Apple TV is re-signed by itself while it is on and awake on the network.
+
+**Good to know:** the free limits (3 apps per device, 10 App IDs a week) apply to the Apple TV too. A tvOS update can drop the pairing, so pair again if the TV stops showing up as *Connected*. Turning off *Automatically Update tvOS* (Settings → System → Software Updates) helps. If the page says the Apple TV helper isn't installed, the image was built without it (the download or its checksum check failed); redeploy the project to try again.
+
 ## Security
 
 - `data/accounts/*/account.env` (and a copy of the first one in `data/config.env`) hold the Apple ID **passwords in plain text** (file mode 600). Use throwaway Apple IDs, and keep the `docker` shared folder admin-only.
-- `data/xdg` holds the anisette identity, which acts like a password for this "device". Don't copy it around or publish it.
+- `data/xdg` holds the anisette identity, which acts like a password for this "device". Don't copy it around or publish it. For an Apple TV it also holds the pairing and the signed-in Apple ID sessions (`data/xdg/PlumeImpactor`): same care.
 - The web UI has its own password but no HTTPS. Keep it on your LAN and don't forward port 8080 on your router.
 
 ## Everyday tasks

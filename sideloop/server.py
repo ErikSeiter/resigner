@@ -6,7 +6,7 @@ import time
 import urllib.parse
 from pathlib import Path
 
-from . import accounts, anisette, auth, config, ipa, pairing, store
+from . import accounts, anisette, appletv, auth, config, ipa, pairing, store
 from .config import LIFETIME_DAYS, MUX, PENDING_IPA, STATE
 from .jobs import redact, run_capture, run_pty
 from .watcher import configured
@@ -72,8 +72,9 @@ class App:
             "groups": [{"id": g, "name": store.group_name(g), "devices": store.group_devices(g)}
                        for g in store.group_ids()],
             "apps": [store.app_view(a) for a in store.app_ids()],
-            "registered": [{"udid": u, "name": store.device_name(u), "live": live.get(u.lower())}
-                           for u in store.device_ids()],
+            "registered": [{"udid": u, "name": store.device_name(u), "kind": store.device_kind(u),
+                            "live": live.get(u.lower())} for u in store.device_ids()],
+            "appletv": {"available": appletv.available()},
             "devices": h["devices"],
             "scanning": h["scanning"],
             "services": {"anisette": h["anisette"], "muxer": h["muxer"]},
@@ -249,6 +250,23 @@ class App:
             raise ValueError("pairing from the browser only works on Linux; on a Mac use Finder")
         return {"job": self.jobs.start("pair", "Pairing a device", lambda j: pairing.pair(j, self.muxers)).id}
 
+    def appletv_discover(self, data):
+        """The Apple TVs that are showing a PIN right now (Settings > Remotes and Devices > Remote App and Devices)."""
+        if not appletv.available():
+            raise ValueError("the Apple TV helper isn't installed in this image")
+        return {"tvs": appletv.pairable()}
+
+    def appletv_pair(self, data):
+        if not appletv.available():
+            raise ValueError("the Apple TV helper isn't installed in this image")
+        try:
+            ip, port = str(data["ip"]).strip(), int(data["port"])
+        except (KeyError, TypeError, ValueError):
+            raise ValueError("which Apple TV?") from None
+        if not re.fullmatch(r"[0-9A-Fa-f:.]{3,45}", ip) or not 0 < port < 65536:
+            raise ValueError("that doesn't look like an Apple TV address")
+        return {"job": self.jobs.start("pairtv", "Pairing the Apple TV", lambda j: appletv.pair(j, ip, port)).id}
+
     def job_input(self, data):
         job = self.jobs.current
         if not job or not job.running:
@@ -282,6 +300,8 @@ class App:
             "/api/refresh": self.refresh,
             "/api/recheck": self.recheck,
             "/api/pair": self.pair,
+            "/api/appletv/discover": self.appletv_discover,
+            "/api/appletv/pair": self.appletv_pair,
             "/api/job/input": self.job_input,
             "/api/job/cancel": self.job_cancel,
         }

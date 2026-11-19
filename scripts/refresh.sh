@@ -57,6 +57,15 @@ DEVICE_NAME="$DEVICE"
 IPA_PATH="$APP_DIR/app.ipa"
 APP_STATE="$APP_DIR/state/$DEVICE"
 TAG="[${APP_NAME:-$APP} on $DEVICE_NAME] "
+# An Apple TV is reached and signed for differently (plumesign instead of AltServer), and only takes tvOS apps.
+if [[ "${DEVICE_KIND:-ios}" == appletv ]]; then
+  [[ "${APP_PLATFORM:-ios}" == tvos ]] || { echo "${TAG}skipped: an Apple TV only takes tvOS apps"; exit 0; }
+  tv_args=(--app "$APP" --device "$DEVICE")
+  (( FORCE )) && tv_args+=(--force)
+  (( RECHECK )) && tv_args+=(--recheck)
+  exec "$(dirname "${BASH_SOURCE[0]}")/refresh-tv.sh" "${tv_args[@]}"
+fi
+[[ "${APP_PLATFORM:-ios}" != tvos ]] || { echo "${TAG}skipped: a tvOS app can't go on an iPhone or iPad"; exit 0; }
 EXPIRY="$APP_STATE/expiry"
 CERT="$APP_STATE/certificate"
 FAILS="$APP_STATE/consecutive_failures"

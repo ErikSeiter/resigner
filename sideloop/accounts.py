@@ -7,7 +7,8 @@ treat the result as another app.
 
 On disk, per account:  data/accounts/<id>/account.env   credentials, priority, certificate folder for AltServer
                        data/accounts/<id>/ledger        one line per newly registered app: time, bundle id, App IDs
-                       data/accounts/<id>/verified      exists once the account has signed something here
+                       data/accounts/<id>/verified      exists once the account has signed something on an iPhone or iPad
+                       data/accounts/<id>/verified-tv   the same for an Apple TV (plumesign keeps its own sign-in)
                        data/accounts/<id>/exhausted     touched when Apple said this account is out of signings
 and per installed app:  data/apps/<app>/state/<udid>/account   the account that signed it
 
@@ -166,6 +167,11 @@ def migrate():
         (_dir(legacy) / "verified").touch()
 
 
+def verified_file(aid, kind="ios"):
+    """AltServer (iPhone, iPad) and plumesign (Apple TV) sign in separately, so each has its own mark."""
+    return _dir(aid) / ("verified-tv" if kind == "appletv" else "verified")
+
+
 def pin_of(app_id, udid):
     try:
         return (APPS / app_id / "state" / udid / "account").read_text().strip() or None
@@ -240,13 +246,15 @@ def pick(app_id, udid, interactive=False, now=None):
 
     An installed app keeps the account that signed it. A new install tries the enabled accounts in priority order,
     those with room first. A background run skips an account that was never used here, because its first sign-in
-    needs a 2FA code that only the web page can take."""
+    needs a 2FA code that only the web page can take. That is judged per kind of device: an Apple ID that has signed
+    for an iPhone still has to sign in once for an Apple TV."""
     pin = pin_of(app_id, udid)
     if pin and pin in ids():
         return [pin]
+    kind = store.device_kind(udid)
     usable = [a for a in ids() if meta(a)["ENABLED"] == "1" and meta(a)["APPLE_ID"] and meta(a)["APPLE_PASSWORD"]]
     if not interactive:
-        usable = [a for a in usable if (_dir(a) / "verified").exists()]
+        usable = [a for a in usable if verified_file(a, kind).exists()]
     return [a for a in usable if room(a, app_id, udid, now)] + [a for a in usable if not room(a, app_id, udid, now)]
 
 
@@ -260,7 +268,7 @@ def record(app_id, udid, aid):
         bundle = store.app_meta(app_id)["BUNDLE_ID"]
         with open(_dir(aid) / "ledger", "a") as f:
             f.write(f"{int(time.time())}\t{bundle}\t{_app_ids_needed(app_id)}\n")
-    (_dir(aid) / "verified").touch()
+    verified_file(aid, store.device_kind(udid)).touch()
     (_dir(aid) / "exhausted").unlink(missing_ok=True)
 
 
@@ -273,7 +281,8 @@ def view(aid, now=None):
     m = meta(aid)
     return {
         "id": aid, "apple_id": m["APPLE_ID"], "priority": int(m["PRIORITY"] or 0), "enabled": m["ENABLED"] == "1",
-        "verified": (_dir(aid) / "verified").exists(), "exhausted": is_exhausted(aid, now),
+        "verified": (_dir(aid) / "verified").exists(), "tv_verified": (_dir(aid) / "verified-tv").exists(),
+        "exhausted": is_exhausted(aid, now),
         "apps": len(pinned(aid)), "per_device": busiest_device(aid), "app_ids_week": app_ids_this_week(aid, now),
     }
 

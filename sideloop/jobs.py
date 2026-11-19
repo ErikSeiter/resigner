@@ -12,7 +12,7 @@ from . import accounts, config
 
 MASK = "••••••••"
 ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
-PROMPT = re.compile(r"two.?factor code|verification code|enter (the )?(2fa |verification )?code", re.I)
+PROMPT = re.compile(r"two.?factor code|verification code|enter (the )?(2fa |verification )?code|enter pin", re.I)
 SECRET = re.compile(r"^(Data|Value) ?: |^X-(Apple|Mme|MMe)-|^(MachineID|One-Time Password|Local User ID|Device UDID|"
                     r"Device Description|Date|Sanitized client info) ?:|^Byte:|^(HMAC_OUT|NP):|anisette|"
                     r"^Received (auth )?response|^Signing: ")
@@ -91,8 +91,12 @@ class Job:
             self.stage, self.fraction, self.needs_input = stage, f, False
         elif line.startswith("Writing to device"):
             self.stage, self.fraction = "send", 0.0
-        elif line.startswith(("Installed profile", "Notify: Installation")):
+        elif line.startswith(("Installed profile", "Notify: Installation", "Installation complete")):
             self.stage, self.fraction = "install", 1.0
+        elif line.startswith("Signing bundle:"):  # plumesign, for an Apple TV
+            self.stage, self.fraction, self.needs_input = "sign", 0.0, False
+        elif line.startswith("Installing to device:"):
+            self.stage, self.fraction = "send", 0.0
         elif "signing and installing" in line:
             if m := APP_START.search(line):
                 self.app = m.group(1)
@@ -108,6 +112,8 @@ class Job:
             self.needs_input = False
             self.lines.append((self.partial.strip() + " ••••••").strip())
             self.partial = ""
+            if len(text.strip()) >= 4:  # the terminal echoes what was typed: a code or PIN must not show up in the log
+                self.words = sorted({*self.words, text.strip()}, key=len, reverse=True)
         os.write(self.fd, (text.strip() + "\n").encode())
 
     def cancel(self):

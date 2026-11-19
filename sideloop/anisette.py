@@ -27,14 +27,16 @@ DEFAULT = "https://new.ani.sidestore.io"
 BAD_FOR = 15 * 60
 
 # AltServer shows its own anisette errors as "Alert: Anisette v3: ..." (an HTTP answer it didn't expect, a failed
-# provisioning, ...). -27677 and -80043 are Apple refusing the anisette identity itself. Anything about the Apple ID
-# (password, 2FA, signing limits) is deliberately not here: another server would not help and every attempt is
-# another sign-in for Apple to see.
+# provisioning, ...). -27677 and -80043 are Apple refusing the anisette identity itself. plumesign (Apple TV) says
+# "Anisette error: ...", "Anisette not provisioned!", "Provisioning socket error ..." or fails a request to the server's /v3/ address.
+# Anything about the Apple ID (password, 2FA, signing limits) is deliberately not here: another server would not
+# help and every attempt is another sign-in for Apple to see.
 FAIL_RE = re.compile(
     r"Alert: Anisette (v3|server)"
     r"|Anisette v3: [^\n]*(answered HTTP|provisioning failed|timed out|rejects the identity)"
     r"|Anisette server [^\n]*(unreachable|can'?t be reached|could not|couldn'?t|timed out|refused)"
-    r"|\((-27677|-80043)\)|anisette data is invalid",
+    r"|\((-27677|-80043)\)|anisette data is invalid"
+    r"|Anisette not provisioned|Anisette error:|Provisioning socket error|error sending request for url \([^)\n]*/v3/",
     re.I,
 )
 

@@ -6,8 +6,8 @@ import time
 from . import ipa
 from .config import APPS, DEVICES, GROUPS, read_env, write_env
 
-APP_KEYS = ["BUNDLE_ID", "APP_NAME", "APP_VERSION", "IPA_SOURCE", "ADDED", "DEVICES", "APP_GROUPS"]
-DEVICE_KEYS = ["DEVICE_NAME", "ADDED"]
+APP_KEYS = ["BUNDLE_ID", "APP_NAME", "APP_VERSION", "IPA_SOURCE", "ADDED", "DEVICES", "APP_GROUPS", "APP_PLATFORM"]
+DEVICE_KEYS = ["DEVICE_NAME", "ADDED", "DEVICE_KIND"]
 GROUP_KEYS = ["GROUP_NAME", "DEVICES", "ADDED"]
 UDID_RE = re.compile(r"^[0-9A-Fa-f-]{20,64}$")
 
@@ -37,16 +37,31 @@ def device_name(udid):
     return read_env(DEVICES / f"{udid}.env", DEVICE_KEYS)["DEVICE_NAME"] or udid
 
 
-def add_device(udid, name, groups=None):
-    """Registers a device. It gets every app that doesn't follow groups, plus the apps of `groups`."""
+def device_kind(udid):
+    """"appletv" for an Apple TV (signed and installed by plumesign), "ios" for an iPhone or iPad (AltServer)."""
+    return "appletv" if read_env(DEVICES / f"{udid}.env", DEVICE_KEYS)["DEVICE_KIND"] == "appletv" else "ios"
+
+
+def app_platform(app_id, meta=None):
+    return "tvos" if (meta or app_meta(app_id))["APP_PLATFORM"] == "tvos" else "ios"
+
+
+def compatible(app_id, udid, meta=None):
+    """An Apple TV only takes tvOS apps, and an iPhone or iPad only iOS apps."""
+    return (device_kind(udid) == "appletv") == (app_platform(app_id, meta) == "tvos")
+
+
+def add_device(udid, name, groups=None, kind="ios"):
+    """Registers a device. It gets every app that doesn't follow groups and fits it, plus the apps of `groups`."""
     if not UDID_RE.match(udid):
         raise ValueError("that doesn't look like a device ID")
     new = udid not in device_ids()
     old = read_env(DEVICES / f"{udid}.env", DEVICE_KEYS)
-    write_env(DEVICES / f"{udid}.env", {"DEVICE_NAME": name or udid, "ADDED": old["ADDED"] or int(time.time())})
+    write_env(DEVICES / f"{udid}.env", {"DEVICE_NAME": name or udid, "ADDED": old["ADDED"] or int(time.time()),
+                                         "DEVICE_KIND": "appletv" if kind == "appletv" else "ios"})
     if new:
         for app_id in app_ids():
-            if app_groups(app_id):
+            if app_groups(app_id) or not compatible(app_id, udid):
                 continue
             devs = app_devices(app_id)
             if udid not in devs:
@@ -151,7 +166,7 @@ def sync_app(app_id):
     if not groups:
         return
     members = {u.lower() for g in groups for u in group_devices(g)}
-    set_app_devices(app_id, [u for u in device_ids() if u.lower() in members])
+    set_app_devices(app_id, [u for u in device_ids() if u.lower() in members])  # set_app_devices drops the unfit ones
 
 
 def sync_apps():
@@ -170,13 +185,15 @@ def app_meta(app_id):
 
 
 def app_devices(app_id, meta=None):
+    meta = meta or app_meta(app_id)
     known = {u.lower(): u for u in device_ids()}
-    return [known[u.lower()] for u in (meta or app_meta(app_id))["DEVICES"].split() if u.lower() in known]
+    return [known[u.lower()] for u in meta["DEVICES"].split()
+            if u.lower() in known and compatible(app_id, known[u.lower()], meta)]
 
 
 def set_app_devices(app_id, udids):
     meta = app_meta(app_id)
-    meta["DEVICES"] = " ".join(udids)
+    meta["DEVICES"] = " ".join(u for u in udids if compatible(app_id, u, meta))
     write_env(APPS / app_id / "meta.env", meta)
 
 
@@ -187,9 +204,10 @@ def app_view(app_id):
         "bundle_id": meta["BUNDLE_ID"],
         "name": meta["APP_NAME"] or app_id,
         "version": meta["APP_VERSION"],
+        "platform": app_platform(app_id, meta),
         "info": ipa.cached(d),
         "groups": app_groups(app_id, meta),
-        "targets": [{"udid": u, "name": device_name(u), "signature": read_state(d / "state" / u)}
+        "targets": [{"udid": u, "name": device_name(u), "kind": device_kind(u), "signature": read_state(d / "state" / u)}
                     for u in app_devices(app_id, meta)],
     }
 
@@ -204,7 +222,8 @@ def add_app(src, info, filename, original=None):
     else:
         (d / "app.orig.ipa").unlink(missing_ok=True)
     old = app_meta(app_id)
-    write_env(d / "meta.env", {
+    platform = "tvos" if info.get("platform") == "tvos" else "ios"
+    meta = {
         "BUNDLE_ID": info["bundle_id"],
         "APP_NAME": info.get("name", ""),
         "APP_VERSION": info.get("version", ""),
@@ -212,7 +231,10 @@ def add_app(src, info, filename, original=None):
         "ADDED": old["ADDED"] or int(time.time()),
         "DEVICES": old["DEVICES"] if old["ADDED"] else " ".join(device_ids()),
         "APP_GROUPS": old["APP_GROUPS"],
-    })
+        "APP_PLATFORM": platform,
+    }
+    meta["DEVICES"] = " ".join(u for u in meta["DEVICES"].split() if compatible(app_id, u, meta))
+    write_env(d / "meta.env", meta)
     sync_app(app_id)
     (d / "info.json").unlink(missing_ok=True)
     return app_id

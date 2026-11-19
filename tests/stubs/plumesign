@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Stands in for plumesign in tests/test_refresh_tv.py and tests/test_appletv.py.
+#   what an Apple ID does is the first word of $STUB_DIR/behaviour/<email>: ok, limit, 2fa, fail (default ok)
+#   a server in $STUB_DIR/badservers fails the way an unreachable anisette server does
+#   $STUB_DIR/sessions lists the Apple IDs that are signed in
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  check)  # check find-pairing --identifier X --auth-tag Y
+    [[ "$1" == find-pairing ]] || exit 2
+    if [[ -n "${STUB_TV_UDID:-}" ]]; then echo "UDID: \`$STUB_TV_UDID\`"; else echo "Failed to validate pairing" >&2; exit 1; fi ;;
+  pair)
+    while (( $# )); do case "$1" in --ip) ip="$2"; shift ;; --port) port="$2"; shift ;; esac; shift; done
+    echo "$ip:$port" >> "$STUB_DIR/pair_calls"
+    printf 'Enter PIN:'
+    read -r pin
+    [[ "$pin" == 1234 ]] || { echo "Authentication SRP error: bad PIN" >&2; exit 1; }
+    dir="$XDG_CONFIG_HOME/PlumeImpactor/pairing_files"; mkdir -p "$dir"
+    udid="${STUB_NEW_TV_UDID:-00008110-001A2B3C4D5E6F78}"
+    echo "stub" > "$dir/$udid.plist"
+    printf '{"name":"Living Room","model":"AppleTV14,1","remotepairing_udid":"%s"}\n' "$udid" > "$dir/$udid.json"
+    echo "Pairing complete" ;;
+  account)
+    [[ "$1" == login ]] || exit 2; shift
+    while (( $# )); do case "$1" in -u) email="$2"; shift ;; -p) ;; esac; shift; done
+    echo "login|$email|$PLUME_ANISETTE_URL" >> "$STUB_DIR/calls"
+    what="$(head -c 20 "$STUB_DIR/behaviour/$email" 2>/dev/null)"; what="${what:-ok}"
+    if [[ "$what" == 2fa ]]; then
+      echo "Enter 2FA code: "
+      read -r code || code=""
+      [[ "$code" == 123456 ]] || { echo "Bad 2FA code" >&2; exit 1; }
+    fi
+    echo "$email" >> "$STUB_DIR/sessions"
+    echo "Successfully logged in and account saved." ;;
+  sign-rsd)
+    while (( $# )); do
+      case "$1" in -u) email="$2"; shift ;; --ip) ip="$2"; shift ;; --port) port="$2"; shift ;;
+        --udid) udid="$2"; shift ;; --output-provision) prov="$2"; shift ;; -p) ipa="$2"; shift ;; esac
+      shift
+    done
+    echo "sign|$email|$ip|$port|$udid|$PLUME_ANISETTE_URL|$XDG_CONFIG_HOME" >> "$STUB_DIR/calls"
+    echo "$PLUME_ANISETTE_URL" >> "$STUB_DIR/servers"
+    echo "[2026-11-19 12:00:00 INFO plumesign] Restoring session for e***@example.com..."
+    if grep -qxF "$PLUME_ANISETTE_URL" "$STUB_DIR/badservers" 2>/dev/null; then
+      echo "Error: Anisette error: Request Error error sending request for url ($PLUME_ANISETTE_URL/v3/client_info)"
+      exit 1
+    fi
+    if ! grep -qxF "$email" "$STUB_DIR/sessions" 2>/dev/null; then
+      echo "Error: Account '$email' not found. Use 'plumesign account list' to see available accounts."
+      exit 1
+    fi
+    what="$(head -c 20 "$STUB_DIR/behaviour/$email" 2>/dev/null)"; what="${what:-ok}"
+    case "$what" in
+      limit) echo "Error: Developer API error 3000 (HTTP Some(200)): You have reached the maximum number of App IDs."; exit 1 ;;
+      fail)  echo "Error: Something broke"; exit 1 ;;
+    esac
+    echo "Signing bundle: $ipa"
+    echo "Installing to device: $udid"
+    python3 - "$prov" "$email" <<'PY'
+import datetime, plistlib, sys
+now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+open(sys.argv[1], "wb").write(plistlib.dumps({
+    "CreationDate": now, "ExpirationDate": now + datetime.timedelta(days=7),
+    "DeveloperCertificates": [sys.argv[2].encode() + b"-certificate"]}))
+PY
+    echo "$email" > "$STUB_DIR/installed"
+    echo "Installation complete!" ;;
+  *) echo "stub plumesign: unknown command $cmd" >&2; exit 2 ;;
+esac

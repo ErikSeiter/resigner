@@ -42,6 +42,15 @@ def _cryptid(z, member):
         return 0
 
 
+def platform_of(info):
+    """"tvos" for an Apple TV app, otherwise "ios" (iPhone and iPad apps, and anything unclear)."""
+    platforms = [str(x).lower() for x in info.get("CFBundleSupportedPlatforms") or []]
+    family = [int(x) for x in info.get("UIDeviceFamily") or [] if str(x).isdigit()]
+    if "appletvos" in platforms or "appletvsimulator" in platforms or str(info.get("DTPlatformName", "")).lower() == "appletvos":
+        return "tvos"
+    return "tvos" if family == [3] else "ios"
+
+
 def inspect(path):
     try:
         z = zipfile.ZipFile(path)
@@ -69,6 +78,7 @@ def inspect(path):
         "version": p.get("CFBundleShortVersionString", ""),
         "build": p.get("CFBundleVersion", ""),
         "min_ios": p.get("MinimumOSVersion", ""),
+        "platform": platform_of(p),
         "size_mb": f"{size / 1e6:.0f}",
         "encrypted": {1: "yes", 0: "no"}.get(enc, "unknown"),
         "tweaks": ", ".join(tweaks),
