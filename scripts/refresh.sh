@@ -10,7 +10,10 @@ ALTSERVER_BIN="${ALTSERVER_BIN:-/usr/local/bin/AltServer}"
 
 [[ -r "$CONFIG" ]] || { echo "missing config: $CONFIG" >&2; exit 78; }
 set -a; . "$CONFIG"; set +a
-: "${APPLE_ID:?}" "${APPLE_PASSWORD:?}"
+# Apple IDs live in $DATA_DIR/accounts (several, in priority order); the pair in config.env is only a copy
+# for older versions. Which one signs an app is decided per run by `python3 -m sideloop.accounts pick`.
+unset APPLE_ID APPLE_PASSWORD
+ACCOUNTS_DIR="$DATA_DIR/accounts"
 : "${RENEW_BEFORE_DAYS:=2}"
 : "${ANISETTE_SERVER:=https://new.ani.sidestore.io}"
 
@@ -69,7 +72,8 @@ export ALTSERVER_KEEP_PROFILES=1
 export HOME="$DATA_DIR/.altserver"
 mkdir -p "$STATE_DIR" "$APP_STATE" "$HOME"
 # AltServer caches its signing certificate in ./AltServerData. Without that cache it revokes the
-# certificate and makes a new one, and iOS then asks to trust the developer again.
+# certificate and makes a new one, and iOS then asks to trust the developer again. Every Apple ID gets
+# its own folder for that (HOME, and so the anisette identity, is shared); see run_altserver.
 cd "$DATA_DIR"
 
 now() { date +%s; }
@@ -223,7 +227,7 @@ save_probe() {
   echo "$c" > "$CERT"
   if [[ -n "$old" && "$old" != "$c" ]]; then
     log "WARNING the signing certificate changed, so iOS will ask you to trust the developer again" \
-        "(Settings > General > VPN & Device Management). It changes when $APPLE_ID is also used by" \
+        "(Settings > General > VPN & Device Management). It changes when ${APPLE_ID:-the Apple ID} is also used by" \
         "Xcode, AltStore, SideStore or Sideloadly, or when $DATA_DIR/AltServerData is lost."
   fi
 }
@@ -263,33 +267,84 @@ fi
 
 [[ -r "$IPA_PATH" ]] || { log "ERROR IPA missing: $IPA_PATH"; record fail "IPA missing"; exit 1; }
 
-log "signing and installing $(basename "$IPA_PATH") on $DEVICE_UDID"
+INTERACTIVE=0
+[[ -t 0 && -t 1 ]] && INTERACTIVE=1
+
+# Runs AltServer in an Apple ID's certificate folder (AltServerData lives in the working directory). HOME is the
+# same for every account, so the anisette identity is shared.
+run_altserver() { ( cd "$ACC_WORK" && export HOME="$ACC_HOME" && exec "$@" ); }
+
+# The Apple IDs to try, best first. An installed app keeps the one that signed it, because a different Apple ID
+# is a different team: iOS would see another app (and lose the data of the old one).
+PREVIOUS=""
+[[ -r "$APP_STATE/account" ]] && PREVIOUS="$(tr -d '[:space:]' < "$APP_STATE/account")"
+pick_args=(--app "$APP" --device "$DEVICE_UDID")
+(( INTERACTIVE )) && pick_args+=(--interactive)
+if ! CANDIDATES="$(python3 -m sideloop.accounts pick "${pick_args[@]}")"; then
+  log "ERROR could not choose an Apple ID"; record fail "could not choose an Apple ID"; exit 1
+fi
+if [[ -z "$CANDIDATES" ]]; then
+  hint="no Apple ID can sign this app. Add one in Settings. A background run only uses an Apple ID that has signed something before, so install once from the web page to sign a new one in"
+  log "FAIL $hint"; record fail "$hint"; exit 1
+fi
+
 out="$(mktemp)"
 trap 'rm -f "$STATE_DIR/.running" "$out"' EXIT
-set +e
-if [[ -t 0 && -t 1 ]]; then
-  timeout --foreground 2400 "$ALTSERVER_BIN" -u "$DEVICE_UDID" -a "$APPLE_ID" -p "$APPLE_PASSWORD" "$IPA_PATH"
-  rc=$?
-else
-  timeout 2400 "$ALTSERVER_BIN" -u "$DEVICE_UDID" -a "$APPLE_ID" -p "$APPLE_PASSWORD" "$IPA_PATH" </dev/null 2>&1 \
-    | tee "$out"
-  rc=${PIPESTATUS[0]}
-  tr '\r' '\n' < "$out" | grep -vE "$NOISE" | cut -c1-400 >> "$LOG_FILE"
-fi
-set -e
+LIMIT_FOUND=""
+n_left="$(printf '%s\n' $CANDIDATES | wc -l)"
+for ACCOUNT in $CANDIDATES; do
+  n_left=$(( n_left - 1 ))
+  LIMIT_FOUND=""
+  { IFS= read -r -d '' APPLE_ID; IFS= read -r -d '' APPLE_PASSWORD; IFS= read -r -d '' ACC_WORK; IFS= read -r -d '' ACC_HOME; } \
+    < <(set -a; . "$ACCOUNTS_DIR/$ACCOUNT/account.env"; printf '%s\0%s\0%s\0%s\0' "$APPLE_ID" "$APPLE_PASSWORD" "$WORK_DIR" "$HOME_DIR")
+  mkdir -p "$ACC_WORK" "$ACC_HOME"
+  : > "$out"
 
-if (( rc == 0 )) && stamp_success; then
-  msg="refreshed, valid until $(fmt_epoch "$(cat "$EXPIRY")")"
-  log "OK $msg"; record ok "$msg"
-  prune_profiles
-  heal_siblings
-  exit 0
-fi
+  log "signing with Apple ID $APPLE_ID [$ACCOUNT]"
+  log "signing and installing $(basename "$IPA_PATH") on $DEVICE_UDID"
+  set +e
+  if (( INTERACTIVE )); then
+    run_altserver timeout --foreground 2400 "$ALTSERVER_BIN" -u "$DEVICE_UDID" -a "$APPLE_ID" -p "$APPLE_PASSWORD" "$IPA_PATH"
+    rc=$?
+  else
+    run_altserver timeout 2400 "$ALTSERVER_BIN" -u "$DEVICE_UDID" -a "$APPLE_ID" -p "$APPLE_PASSWORD" "$IPA_PATH" </dev/null 2>&1 \
+      | tee "$out"
+    rc=${PIPESTATUS[0]}
+    tr '\r' '\n' < "$out" | grep -vE "$NOISE" | cut -c1-400 >> "$LOG_FILE"
+  fi
+  set -e
+
+  if (( rc == 0 )) && stamp_success; then
+    python3 -m sideloop.accounts record --app "$APP" --device "$DEVICE_UDID" --account "$ACCOUNT" || true
+    msg="refreshed, valid until $(fmt_epoch "$(cat "$EXPIRY")")"
+    if [[ "$PREVIOUS" != "$ACCOUNT" ]]; then
+      log "NOTE signed with $APPLE_ID. If iOS says Untrusted Developer, trust it in Settings > General > VPN & Device Management"
+    fi
+    log "OK $msg"; record ok "$msg"
+    prune_profiles
+    heal_siblings
+    exit 0
+  fi
+
+  # Apple refusing because this account has used up its signings: another account can take a new app. An app
+  # that is already installed has to stay with the account that signed it.
+  if (( rc != 0 )) && [[ -z "$PREVIOUS" || "$PREVIOUS" != "$ACCOUNT" ]] && python3 -m sideloop.accounts limit < "$out"; then
+    LIMIT_FOUND="$ACCOUNT"
+    python3 -m sideloop.accounts exhausted --account "$ACCOUNT" || true
+    if (( n_left > 0 )); then
+      log "$APPLE_ID has no signings left ($(tr '\r' '\n' < "$out" | grep -iE 'maximum|limit|too many' | head -n1 | cut -c1-160)); trying the next Apple ID"
+      continue
+    fi
+  fi
+  break
+done
 
 hint=""
 if (( rc == 0 )); then
   rc=1
   hint="AltServer finished, but the app isn't on the device (did it lock or leave Wi-Fi mid-copy?)"
+elif [[ -n "$LIMIT_FOUND" ]]; then
+  hint="Apple says every available Apple ID is out of signings; add another one or wait (a free Apple ID allows 3 apps per device and 10 App IDs a week)"
 elif grep -qiE 'two.?factor code|verification code' "$out"; then
   hint="Apple is asking for a 2FA code; sign it from the web UI once"
 elif (( rc == 124 )); then

@@ -9,6 +9,8 @@ CONFIG = DATA / "config.env"
 STATE = DATA / "state"
 APPS = DATA / "apps"
 DEVICES = DATA / "devices"
+GROUPS = DATA / "groups"
+ACCOUNTS = DATA / "accounts"
 UI_FILE = DATA / "ui.json"
 PENDING_IPA = DATA / ".pending.ipa"
 

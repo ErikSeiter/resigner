@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# "copy <dir>" writes the signed provisioning profile of whatever the stub AltServer installed last.
+args=("$@")
+for i in "${!args[@]}"; do
+  if [[ "${args[$i]}" == copy ]]; then
+    dir="${args[$((i+1))]}"
+    [[ -r "$STUB_DIR/installed" ]] || exit 0
+    python3 - "$dir" "$(cat "$STUB_DIR/installed")" <<'PY'
+import datetime, hashlib, plistlib, subprocess, sys, os
+dir, email = sys.argv[1:3]
+bundle = os.environ["STUB_BUNDLE"]
+team = "T" + hashlib.sha1(email.encode()).hexdigest()[:8].upper()
+now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+plist = plistlib.dumps({
+    "Entitlements": {"application-identifier": f"{team}.{bundle}.{team}"},
+    "CreationDate": now, "ExpirationDate": now + datetime.timedelta(days=7),
+    "UUID": f"uuid-{team}", "DeveloperCertificates": [email.encode() + b"-certificate"],
+})
+open(dir + "/p.plist", "wb").write(plist)
+subprocess.run(["openssl", "smime", "-sign", "-signer", os.environ["STUB_PKI"] + "/cert.pem",
+                "-inkey", os.environ["STUB_PKI"] + "/key.pem", "-in", dir + "/p.plist",
+                "-out", dir + "/p.mobileprovision", "-outform", "DER", "-nodetach"], check=True)
+os.unlink(dir + "/p.plist")
+PY
+    exit 0
+  fi
+done
+exit 0

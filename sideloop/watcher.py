@@ -1,7 +1,7 @@
 import threading
 import time
 
-from . import config, store
+from . import accounts, config, store
 from .config import APPS
 from .jobs import run_capture
 from .log import log
@@ -13,8 +13,7 @@ RUN_TIMEOUT = 6 * 60 * 60
 
 
 def configured(cfg=None):
-    cfg = cfg or config.read()
-    return bool(cfg["APPLE_ID"] and cfg["APPLE_PASSWORD"] and store.device_ids() and store.app_ids())
+    return bool(accounts.configured() and store.device_ids() and store.app_ids())
 
 
 class Watcher:

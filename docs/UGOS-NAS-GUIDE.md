@@ -52,6 +52,12 @@ Go to `http://<nas-ip>:8080` in a browser on your home network and **set a passw
 
 In the web UI add the Apple ID and its **regular password**. App-specific passwords don't work.
 
+You can add **more than one** (Settings → Apple IDs). The first one that has room signs a new app; when it runs out, the next one takes over. An installed app always stays with the Apple ID that signed it, because another Apple ID would be another developer and iOS would treat the result as a different app. Each Apple ID has to be **trusted once** on the device (Settings → General → VPN & Device Management), and its first install needs a 2FA code that you enter in the web page.
+
+## 5b. Groups (optional)
+
+Settings → Groups lets you make sets of devices, for example *Family iPads*. Tie an app to a group (the chips under the app) and it only goes to that group's devices. Apps that aren't tied to a group go to every device, including ones you add later.
+
 ## 6. Add an IPA
 
 Press **Add App…** and choose the `.ipa`. Sideloop shows what it found (encryption, tweaks, extensions).
@@ -74,13 +80,13 @@ Then press **Add App**.
 
 ## 9. Let it renew itself
 
-Leave **Automatic** on. Sideloop re-signs when less than the *Re-sign Early* time (default 2 days) is left. For that the iPhone must be **unlocked and on your home Wi-Fi at some point**. Free Apple ID limits: **3 apps per device** and **10 App IDs per week** (every app extension needs its own App ID, one more reason to remove them).
+Leave **Automatic** on. Sideloop re-signs when less than the *Re-sign Early* time (default 2 days) is left. For that the iPhone must be **unlocked and on your home Wi-Fi at some point**. Free Apple ID limits: **3 apps per device** and **10 App IDs per week** (every app extension needs its own App ID, one more reason to remove them). With several Apple IDs, a new app moves on to the next one when the first has no room left.
 
 While you are troubleshooting, **switch Automatic off**: every automatic attempt that reaches Apple can make your iPhone show an *Apple ID sign-in requested* prompt.
 
 ## Security
 
-- `data/config.env` holds the Apple ID **password in plain text** (file mode 600). Use a throwaway Apple ID, and keep the `docker` shared folder admin-only.
+- `data/accounts/*/account.env` (and a copy of the first one in `data/config.env`) hold the Apple ID **passwords in plain text** (file mode 600). Use throwaway Apple IDs, and keep the `docker` shared folder admin-only.
 - `data/xdg` holds the anisette identity, which acts like a password for this "device". Don't copy it around or publish it.
 - The web UI has its own password but no HTTPS. Keep it on your LAN and don't forward port 8080 on your router.
 

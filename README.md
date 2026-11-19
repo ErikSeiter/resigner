@@ -36,6 +36,8 @@ A small self-hosted service with a web UI for any Linux machine (amd64 or arm64)
 - [x] Checks each IPA for FairPlay encryption, tweaks and app extensions
 - [x] Apple sign-in through any anisette v3 server: a public one, or your own [anisette-v3-server](https://github.com/Dadoum/anisette-v3-server)
 - [x] Optional removal of app extensions so free Apple IDs can install apps that have them
+- [x] **Groups** of devices: tie an app to a group (for example "Family iPads") and it only goes to that group's devices; a new device only gets the apps that aren't tied to a group
+- [x] **Several Apple IDs** in a priority order: a new app is signed with the first Apple ID that still has room and the next one takes over when Apple says the limit is reached. An installed app always stays with the Apple ID that signed it
 - [x] Python standard library only, one Docker image for amd64 and arm64
 
 ## Demo (upstream)
@@ -95,11 +97,21 @@ Pair the device in Finder and enable **Show this iPhone when on Wi-Fi**.
 - Apple asks for a **2FA code** on the first sign-in. Enter it in the web UI (the background re-signer can't answer it). After that, sign-ins are normally silent.
 - The device must be **unlocked and on the same Wi-Fi** while a re-sign runs.
 - A free account allows 3 apps per device and 10 App IDs per week. Each app extension needs its own App ID.
+- **Several Apple IDs:** add them under *Apple IDs* in Settings and order them with the arrows. The switch decides whether an Apple ID takes *new* apps; it never strands what it already signed. Sideloop counts the apps and App IDs it has signed per Apple ID as a hint, and treats Apple's "limit reached" answer as the real signal to try the next one. All Apple IDs share one anisette identity (it belongs to the install, not to an Apple ID). Each Apple ID is a separate developer for iOS, so trust each one once under **VPN & Device Management**. The first install with a new Apple ID needs a 2FA code, so a background run only picks an Apple ID that has signed something before; start that install from the web page.
+- **Groups:** an app tied to one or more groups reaches exactly the devices in them. Deleting a group leaves its apps where they are; apps that followed no other group then go back to following new devices.
 - Trust the developer once in **Settings > General > VPN & Device Management**. Refreshes keep it trusted.
 - If Apple sign-in stops working, check for a newer tag at [jaakkopalvaila/AltServer-Linux](https://github.com/jaakkopalvaila/AltServer-Linux/tags) and update `ALTSERVER_TAG` in the `Dockerfile`. AltServer is built from that tag with the patches in `altserver/`. See [Troubleshooting](docs/TROUBLESHOOTING.md) for the error codes.
 - The anisette identity (a file that works like a password for this "device") is stored in `./data/xdg`. Don't share it.
 
 Data is stored in `./data`.
+
+## Development
+
+```bash
+python3 -m unittest discover -s tests -t .
+```
+
+The tests run `scripts/refresh.sh` against stand-ins for AltServer and the libimobiledevice tools (`tests/stubs/`), so they need `bash`, `openssl`, `flock` and `script` but no phone and no Apple ID.
 
 ## Credits
 

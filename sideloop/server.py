@@ -1,11 +1,12 @@
 import http.server
 import json
 import os
+import re
 import time
 import urllib.parse
 from pathlib import Path
 
-from . import auth, config, ipa, pairing, store
+from . import accounts, auth, config, ipa, pairing, store
 from .config import LIFETIME_DAYS, MUX, PENDING_IPA, STATE
 from .jobs import redact, run_capture, run_pty
 from .watcher import configured
@@ -15,6 +16,27 @@ COOKIE = "sideloop_session"
 CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:"
 MAX_JSON = 1_000_000
 MAX_IPA = 4 * 1024 ** 3
+
+
+SIGNED_WITH = re.compile(r"signing with Apple ID .*\[([^\]]+)\]")
+
+
+def run_refresh(job, argv):
+    """Runs refresh.sh on a terminal so a 2FA code can be typed in. If one specific app fails because Apple says the
+    account that was picked is out of signings, that account is set aside and the next one gets a go."""
+    targeted = "--app" in argv and "--device" in argv
+    tried = set()
+    for _ in range(max(1, len(accounts.ids()))):
+        start = len(job.lines)
+        run_pty(job, argv)
+        text = "\n".join(job.lines[start:])
+        used = SIGNED_WITH.findall(text)
+        if (not targeted or job.rc == 0 or job.cancelled or not used or used[-1] in tried
+                or not accounts.LIMIT_RE.search(text)):
+            return
+        tried.add(used[-1])
+        accounts.mark_exhausted(used[-1])
+        job.say("Apple says that Apple ID is out of signings. Trying the next one…")
 
 
 class App:
@@ -30,9 +52,11 @@ class App:
             "mode": MUX,
             "now": int(time.time()),
             "configured": configured(cfg),
-            "config": {"apple_id": cfg["APPLE_ID"], "has_password": bool(cfg["APPLE_PASSWORD"]),
-                       "renew_before_days": config.renew_before_days(cfg), "lifetime_days": LIFETIME_DAYS,
+            "config": {"renew_before_days": config.renew_before_days(cfg), "lifetime_days": LIFETIME_DAYS,
                        "auto_check": cfg["AUTO_CHECK"] == "1"},
+            "accounts": [accounts.view(a) for a in accounts.ids()],
+            "groups": [{"id": g, "name": store.group_name(g), "devices": store.group_devices(g)}
+                       for g in store.group_ids()],
             "apps": [store.app_view(a) for a in store.app_ids()],
             "registered": [{"udid": u, "name": store.device_name(u), "live": live.get(u.lower())}
                            for u in store.device_ids()],
@@ -76,7 +100,7 @@ class App:
         d = self.health.visible(str(data["udid"]))
         if not d:
             raise ValueError("that device isn't visible right now")
-        store.add_device(d["udid"], d["name"])
+        store.add_device(d["udid"], d["name"], [g for g in data.get("groups", []) if g in store.group_ids()])
         self.health.scan()
 
     def remove_device(self, data):
@@ -91,6 +115,8 @@ class App:
         if not app:
             raise ValueError("which app?")
         self.idle()
+        if app["groups"]:
+            raise ValueError("this app follows its groups; change the groups instead")
         store.set_app_devices(app["id"], [u for u in map(store.resolve_device, data.get("devices", [])) if u])
 
     def use_ipa(self, data):
@@ -108,8 +134,12 @@ class App:
             if "error" in stripped_info:
                 stripped.unlink(missing_ok=True)
                 raise ValueError(stripped_info["error"])
-            return {"id": store.add_app(stripped, stripped_info, filename, original=PENDING_IPA)}
-        return {"id": store.add_app(PENDING_IPA, info, filename)}
+            app_id = store.add_app(stripped, stripped_info, filename, original=PENDING_IPA)
+        else:
+            app_id = store.add_app(PENDING_IPA, info, filename)
+        if data.get("groups"):
+            store.set_app_groups(app_id, [g for g in data["groups"] if g in store.group_ids()])
+        return {"id": app_id}
 
     def remove_app(self, data):
         if str(data.get("id")) not in store.app_ids():
@@ -117,16 +147,56 @@ class App:
         self.idle()
         store.remove_app(str(data["id"]))
 
-    def apple_id(self, data):
-        apple_id = str(data.get("apple_id", "")).strip()
-        if "@" not in apple_id:
-            raise ValueError("enter the Apple ID's email address")
-        values = {"APPLE_ID": apple_id}
-        if data.get("password"):
-            values["APPLE_PASSWORD"] = str(data["password"])
-        elif not config.read()["APPLE_PASSWORD"]:
-            raise ValueError("enter the password")
-        config.update(values)
+    def account(self, data):
+        aid = str(data.get("id", ""))
+        if aid not in accounts.ids():
+            raise ValueError("no such Apple ID")
+        return aid
+
+    def account_save(self, data):
+        accounts.save(data.get("apple_id", ""), data.get("password"))
+
+    def account_remove(self, data):
+        self.idle()
+        return {"orphaned": accounts.remove(self.account(data))}
+
+    def account_move(self, data):
+        if data.get("direction") not in ("up", "down"):
+            raise ValueError("up or down?")
+        accounts.move(self.account(data), data["direction"])
+
+    def account_enable(self, data):
+        accounts.set_enabled(self.account(data), bool(data.get("enabled")))
+
+    def group(self, data):
+        gid = str(data.get("id", ""))
+        if gid not in store.group_ids():
+            raise ValueError("no such group")
+        return gid
+
+    def group_add(self, data):
+        gid = store.add_group(data.get("name", ""))
+        store.set_group_devices(gid, [u for u in map(store.resolve_device, data.get("devices", [])) if u])
+        return {"id": gid}
+
+    def group_rename(self, data):
+        store.rename_group(self.group(data), data.get("name", ""))
+
+    def group_remove(self, data):
+        self.idle()
+        store.remove_group(self.group(data))
+
+    def group_devices(self, data):
+        gid = self.group(data)
+        self.idle()
+        store.set_group_devices(gid, [u for u in map(store.resolve_device, data.get("devices", [])) if u])
+
+    def app_groups(self, data):
+        app = self.app(data)
+        if not app:
+            raise ValueError("which app?")
+        self.idle()
+        store.set_app_groups(app["id"], [g for g in data.get("groups", []) if g in store.group_ids()])
 
     def settings(self, data):
         values = {}
@@ -153,7 +223,7 @@ class App:
             args, title = args + ["--force"], f"Signing {what}"
         else:
             title = "Checking if a refresh is due"
-        return {"job": self.jobs.start("refresh", title, lambda j: run_pty(j, ["refresh.sh", *args])).id}
+        return {"job": self.jobs.start("refresh", title, lambda j: run_refresh(j, ["refresh.sh", *args])).id}
 
     def recheck(self, data):
         args, what = self._target(data)
@@ -184,7 +254,16 @@ class App:
             "/api/app/devices": self.set_app_devices,
             "/api/app/remove": self.remove_app,
             "/api/ipa/use": self.use_ipa,
-            "/api/appleid": self.apple_id,
+            "/api/appleid": self.account_save,
+            "/api/account/save": self.account_save,
+            "/api/account/remove": self.account_remove,
+            "/api/account/move": self.account_move,
+            "/api/account/enable": self.account_enable,
+            "/api/group/add": self.group_add,
+            "/api/group/rename": self.group_rename,
+            "/api/group/remove": self.group_remove,
+            "/api/group/devices": self.group_devices,
+            "/api/app/groups": self.app_groups,
             "/api/settings": self.settings,
             "/api/refresh": self.refresh,
             "/api/recheck": self.recheck,

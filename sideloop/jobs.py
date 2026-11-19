@@ -8,7 +8,7 @@ import subprocess
 import threading
 import time
 
-from . import config
+from . import accounts, config
 
 MASK = "••••••••"
 ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
@@ -26,9 +26,21 @@ def hidden(line):
     return bool(PROGRESS.match(line) or NOISE.match(line) or SECRET.search(line) or len(line) > MAX_LINE)
 
 
+def secrets_list():
+    """Every Apple ID password, longest first so one that contains another is still masked whole."""
+    found = {config.read()["APPLE_PASSWORD"]} | {accounts.meta(a)["APPLE_PASSWORD"] for a in accounts.ids()}
+    return sorted((p for p in found if p), key=len, reverse=True)
+
+
+def mask(text, words):
+    for word in words:
+        text = text.replace(word, MASK)
+    return text
+
+
 def redact(lines):
-    secret = config.read()["APPLE_PASSWORD"]
-    return [ln.replace(secret, MASK) if secret else ln for ln in lines if not hidden(ln)]
+    words = secrets_list()
+    return [mask(ln, words) for ln in lines if not hidden(ln)]
 
 
 class Job:
@@ -39,7 +51,7 @@ class Job:
         self.stage, self.fraction, self.app = None, 0.0, None
         self.pid, self.fd, self.cancelled = None, None, False
         self.lock = threading.Lock()
-        self.secret = config.read()["APPLE_PASSWORD"]
+        self.words = secrets_list()
 
     @property
     def running(self):
@@ -47,8 +59,7 @@ class Job:
 
     def add(self, text):
         text = ANSI.sub("", text)
-        if self.secret:
-            text = text.replace(self.secret, MASK)
+        text = mask(text, self.words)
         with self.lock:
             buf = (self.partial + text).replace("\r\n", "\n").replace("\r", "\n")
             *done, self.partial = buf.split("\n")

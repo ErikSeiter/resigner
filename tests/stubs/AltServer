@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Stands in for AltServer in tests/test_refresh.py. What it does for an Apple ID is the first word of
+# $STUB_DIR/behaviour/<email>: ok, limit, 2fa, fail (default: ok).
+while (( $# > 1 )); do
+  case "$1" in -a) email="$2"; shift ;; -u) udid="$2"; shift ;; -p) ;; esac
+  shift
+done
+echo "$email|$PWD|$HOME" >> "$STUB_DIR/calls"
+what="$(head -c 20 "$STUB_DIR/behaviour/$email" 2>/dev/null)"; what="${what:-ok}"
+case "$what" in
+  ok)    echo "Signing Progress: 0.5"; echo "Installation Progress: 1.0"; echo "$email" > "$STUB_DIR/installed" ;;
+  limit) echo "Your maximum App ID limit has been reached. You may create up to 10 App IDs every 7 days."; exit 1 ;;
+  2fa)   echo "Enter two-factor code:"; exit 1 ;;
+  *)     echo "Something broke"; exit 1 ;;
+esac

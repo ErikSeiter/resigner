@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+[[ "$1" == "-l" ]] && echo "$STUB_UDID"
+exit 0

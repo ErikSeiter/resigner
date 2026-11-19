@@ -158,6 +158,11 @@ button.cell:active:not(:disabled){background:var(--fill-3)}
 .chip{border:0;border-radius:999px;padding:4px 10px;font-size:13px;font-weight:500;cursor:pointer;background:var(--fill-3);color:var(--label-2);display:inline-flex;align-items:center;gap:4px;letter-spacing:-.005em}
 .chip.on{background:color-mix(in srgb,var(--blue) 16%,transparent);color:var(--blue)}
 .appcell{align-items:flex-start}
+.i.up{transform:rotate(-90deg)} .i.down{transform:rotate(90deg)}
+.iconbtn:disabled{opacity:.25;cursor:default}
+.iconbtn.blue{color:var(--blue)}
+.tools{display:flex;align-items:center;gap:14px;flex:none}
+.cell .sub.lbl{margin:8px 0 -3px;text-transform:uppercase;font-size:11px;letter-spacing:.02em}
 .toast{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top));transform:translateX(-50%);z-index:40;background:var(--elev);color:var(--label);padding:12px 20px;border-radius:999px;font-size:15px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.18),0 0 0 .5px var(--sep);animation:drop .35s cubic-bezier(.2,.8,.2,1);max-width:calc(100% - 32px);text-align:center}
 @keyframes drop{from{transform:translate(-50%,-30px);opacity:0}}
 
@@ -305,6 +310,8 @@ function sig(t) {
   if (left <= S.config.renew_before_days * 86400) return {cls:"warn", text:`${dur(left)} left`, left};
   return {cls:"ok", text:`${dur(left)} left`, left};
 }
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const accName = id => { const a = ((S && S.accounts) || []).find(x => x.id === id); return a ? a.apple_id : ""; };
 const devState = d => !d.live ? ["", "Away"] : d.live.reachable ? ["ok", "Connected"] : ["warn", "Locked"];
 const devIcon = d => /ipad/i.test((d.live && d.live.model) || d.name) ? "tablet-portrait" : "phone-portrait";
 
@@ -318,6 +325,10 @@ function appsView() {
   const onDev = d => apps.map(a => ({a, t: a.targets.find(t => t.udid === d.udid)})).filter(x => x.t);
   const issues = [];
   if (!S.services.anisette || !S.services.muxer) issues.push(["bad", `${!S.services.anisette ? "The Apple sign-in helper" : "The device connection service"} isn't running.`]);
+  for (const a of S.accounts || []) {
+    if (a.exhausted) issues.push(["", `${a.apple_id} is out of signings for now, so new apps go to the next Apple ID.`]);
+    else if ((S.accounts || []).length > 1 && a.enabled && !a.verified) issues.push(["", `${a.apple_id} hasn't signed anything yet. It is used once an install you start here needs it, and you'll be asked for a code then.`]);
+  }
   if (!c.auto_check) issues.push(["", "Automatic re-signing is off."]);
   else for (const d of devs) {
     const due = onDev(d).some(({t}) => !t.signature.expiry || t.signature.expiry - S.now <= window);
@@ -334,7 +345,7 @@ function appsView() {
         const pct = t.signature.expiry ? Math.max(0, Math.min(100, s.left / life * 100)) : 0;
         return `<div class="approw">${appIcon(a, "md")}
           <div class="mid"><div class="nm">${esc(a.name)}</div>
-            <div class="st ${failed ? "bad" : s.cls}">${failed ? "Last re-sign failed" : s.text}</div>
+            <div class="st ${failed ? "bad" : s.cls}">${failed ? "Last re-sign failed" : s.text}${(S.accounts || []).length > 1 && t.signature.account && accName(t.signature.account) ? ` · ${esc(accName(t.signature.account))}` : ""}</div>
             ${t.signature.expiry ? `<div class="meter ${s.cls}"><i style="width:${pct}%"></i></div>` : ""}</div>
           <button class="cap ${s.cls === "ok" ? "" : "solid"}" data-sign="${esc(a.id)}" data-dev="${esc(d.udid)}" ${busy ? "disabled" : ""}>${t.signature.expiry ? "Re-sign" : "Install"}</button></div>`;
       }).join("") || `<div class="cell"><span class="k" style="color:var(--label-2)">No apps on this device</span><button class="linkbtn" data-go="settings">Choose</button></div>`}</div>
@@ -456,6 +467,8 @@ function settingsView() {
   const visible = (S.devices || []).filter(d => !known.has(d.udid.toLowerCase()));
   const replacing = pending && apps.find(a => a.bundle_id === pending.info.bundle_id);
   const appIds = apps.reduce((n, a) => n + 1 + (+(a.info && a.info.extension_count) || 0), 0);
+  const groups = S.groups || [], check = ic("checkmark", 12);
+  const accs = S.accounts || [];
   const trash = (kind, id, label) => `<button class="iconbtn ${confirmRemove === kind + id ? "armed" : ""}" data-remove="${esc(kind + id)}" aria-label="Remove ${esc(label)}">${confirmRemove === kind + id ? "Remove" : ic("trash-outline", 20)}</button>`;
   return `
   <div class="sect">
@@ -469,20 +482,36 @@ function settingsView() {
       <button class="cell action" id="scan" ${S.scanning ? "disabled" : ""}>${S.scanning ? "Scanning…" : "Scan Again"}</button>
       ${canPair ? `<button class="cell action" id="pair">Pair New Device…</button>` : ""}
     </div>
-    <div class="foot">${canPair ? "To pair, plug the device into this machine and tap Trust. After that it works over Wi‑Fi. " : ""}A new device gets all your apps; change that per app below.</div>
+    <div class="foot">${canPair ? "To pair, plug the device into this machine and tap Trust. After that it works over Wi‑Fi. " : ""}A new device gets every app that isn't tied to a group.</div>
+  </div>
+
+  <div class="sect">
+    <div class="shead"><h3>Groups</h3></div>
+    <div class="list">
+      ${groups.map(g => { const on = new Set(g.devices.map(u => u.toLowerCase())), n = apps.filter(a => (a.groups || []).includes(g.id)).length;
+        return `<div class="cell ind appcell">${tile("var(--blue)", "apps-outline")}<span class="k">${esc(g.name)}<span class="sub">${plural(g.devices.length, "device")} · ${plural(n, "app")}</span>
+          <span class="chips">${devs.map(d => `<button class="chip ${on.has(d.udid.toLowerCase()) ? "on" : ""}" data-gdev="${esc(g.id)}" data-dev="${esc(d.udid)}">${on.has(d.udid.toLowerCase()) ? check : ""}${esc(d.name)}</button>`).join("") || `<span class="sub">Add a device first</span>`}</span></span>
+          <span class="tools"><button class="linkbtn" data-rename="${esc(g.id)}">Rename</button>${trash("grp:", g.id, g.name)}</span></div>`; }).join("")}
+      <form id="gaddf" class="cell"><input class="fi" id="gname" style="text-align:left;color:var(--label)" placeholder="New group, e.g. Family iPads" maxlength="40"><button class="cap solid">Add</button></form>
+    </div>
+    <div class="foot">An app tied to a group goes only to that group's devices. Apps you don't tie to a group go to every device, including new ones.</div>
   </div>
 
   <div class="sect">
     <div class="shead"><h3>Apps</h3></div>
     <div class="list">
-      ${apps.map(a => { const on = new Set(a.targets.map(t => t.udid));
+      ${apps.map(a => { const on = new Set(a.targets.map(t => t.udid)), follows = (a.groups || []).length > 0, lbl = t => groups.length ? `<span class="sub lbl">${t}</span>` : "";
         return `<div class="cell ind appcell">${appIcon(a, "xs")}<span class="k">${esc(a.name)}<span class="sub">${esc(a.version)}</span>
-          ${devs.length > 1 ? `<span class="chips">${devs.map(d => `<button class="chip ${on.has(d.udid) ? "on" : ""}" data-toggle="${esc(a.id)}" data-dev="${esc(d.udid)}">${on.has(d.udid) ? ic("checkmark", 12) : ""}${esc(d.name)}</button>`).join("")}</span>` : ""}</span>
+          ${groups.length ? `${lbl("Groups")}<span class="chips">${groups.map(g => `<button class="chip ${a.groups.includes(g.id) ? "on" : ""}" data-agroup="${esc(a.id)}" data-g="${esc(g.id)}">${a.groups.includes(g.id) ? check : ""}${esc(g.name)}</button>`).join("")}</span>` : ""}
+          ${follows ? `<span class="sub" style="margin-top:7px">On ${a.targets.length ? a.targets.map(t => esc(t.name)).join(", ") : "no devices yet"}</span>`
+            : devs.length > 1 ? `${lbl("Devices")}<span class="chips">${devs.map(d => `<button class="chip ${on.has(d.udid) ? "on" : ""}" data-toggle="${esc(a.id)}" data-dev="${esc(d.udid)}">${on.has(d.udid) ? check : ""}${esc(d.name)}</button>`).join("")}</span>` : ""}</span>
           ${trash("app:", a.id, a.name)}</div>`; }).join("")}
       ${pending ? `<div class="cell ind">${appIcon(pending.info, "xs")}<span class="k">${esc(pending.info.name)}<span class="sub">${esc(pending.info.version)} · ${esc(pending.filename)}</span></span></div>
         ${ipaWarnings(pending.info)}
         ${+pending.info.extension_count ? `<div class="cell ind">${tile("var(--orange)", "apps-outline")}<label for="stripx" class="k">Remove App Extensions<span class="sub">Free Apple IDs often can't install them. Drops share sheet, widgets and notifications.</span></label>${sw("stripx", pending.strip)}</div>` : ""}
-        <button class="cell action" id="useipa" style="font-weight:600">${replacing ? `Replace ${esc(replacing.name)}` : devs.length > 1 ? "Add to All Devices" : "Add App"}</button>
+        ${groups.length && !replacing ? `<div class="cell ind appcell"><span class="k">Install on<span class="chips">${groups.map(g => `<button class="chip ${pending.groups.includes(g.id) ? "on" : ""}" data-pgroup="${esc(g.id)}">${pending.groups.includes(g.id) ? check : ""}${esc(g.name)}</button>`).join("")}</span>
+          <span class="sub" style="margin-top:7px">${pending.groups.length ? "Only the devices of these groups." : "Pick groups, or none for every device."}</span></span></div>` : ""}
+        <button class="cell action" id="useipa" style="font-weight:600">${replacing ? `Replace ${esc(replacing.name)}` : pending.groups.length ? "Add to Selected Groups" : devs.length > 1 ? "Add to All Devices" : "Add App"}</button>
         <button class="cell action" id="dropipa" style="color:var(--red)">Cancel</button>`
       : `<div class="drop" id="drop">${ic("add-circle", 22)}<span class="k" id="progt">Add App…</span></div>
          <div class="progress hidden" id="prog"><i></i></div>
@@ -492,13 +521,21 @@ function settingsView() {
   </div>
 
   <div class="sect">
-    <div class="shead"><h3>Apple ID</h3></div>
-    <form id="aidf" autocomplete="off"><div class="list">
-      <div class="cell"><label for="aid">Email</label><input class="fi" id="aid" type="email" value="${esc(c.apple_id)}" placeholder="name@example.com" required></div>
-      <div class="cell"><label for="apw">Password</label><input class="fi" id="apw" type="password" placeholder="${c.has_password ? "Saved" : "Required"}" autocomplete="new-password"></div>
-      <button class="cell action">Save</button>
+    <div class="shead"><h3>Apple IDs</h3></div>
+    <div class="list">
+      ${accs.map((a, i) => `<div class="cell ind appcell">${tile(a.enabled ? "var(--green)" : "var(--gray)", "lock-closed")}<span class="k">${esc(a.apple_id)}
+          <span class="sub">${[i === 0 && a.enabled ? "First choice" : "", !a.verified ? "Not used yet" : a.exhausted ? "Out of signings for now" : plural(a.apps, "app"), a.app_ids_week ? `${a.app_ids_week} of 10 App IDs this week` : ""].filter(Boolean).join(" · ")}</span></span>
+          <span class="tools">
+            <button class="iconbtn blue" data-mv="up" data-acc="${esc(a.id)}" aria-label="Move up" ${i === 0 ? "disabled" : ""}>${ic("chevron-forward", 18, "up")}</button>
+            <button class="iconbtn blue" data-mv="down" data-acc="${esc(a.id)}" aria-label="Move down" ${i === accs.length - 1 ? "disabled" : ""}>${ic("chevron-forward", 18, "down")}</button>
+            ${sw("accon-" + a.id, a.enabled)}${trash("acc:", a.id, a.apple_id)}</span></div>`).join("")}
+    </div>
+    <form id="aidf" autocomplete="off"><div class="list" style="margin-top:14px">
+      <div class="cell"><label for="aid">Email</label><input class="fi" id="aid" type="email" placeholder="name@example.com" required></div>
+      <div class="cell"><label for="apw">Password</label><input class="fi" id="apw" type="password" placeholder="Required" autocomplete="new-password"></div>
+      <button class="cell action">${accs.length ? "Add Apple ID" : "Save"}</button>
     </div></form>
-    <div class="foot">Use the regular password, not an app-specific one.</div>
+    <div class="foot">Use the regular password, not an app-specific one. A new app is signed with the first Apple ID that has room (the switch decides whether an Apple ID takes new apps); when it runs out, the next one is used. An app stays with the Apple ID that signed it, and every Apple ID is another developer to trust on the device (Settings → General → VPN & Device Management). Entering the same email again updates its password.</div>
   </div>
 
   <div class="sect">
@@ -541,6 +578,29 @@ function wire() {
   root.querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
   root.querySelectorAll("[data-sign]").forEach(b => b.onclick = () => startJob("/api/refresh", {force:true, app:b.dataset.sign, device:b.dataset.dev}));
   root.querySelectorAll("[data-add]").forEach(b => b.onclick = () => act(() => api("/api/device/add", {json:{udid:b.dataset.add}}), "Device added"));
+  root.querySelectorAll("[data-gdev]").forEach(b => b.onclick = () => {
+    const g = S.groups.find(x => x.id === b.dataset.gdev), on = new Set(g.devices);
+    on.has(b.dataset.dev) ? on.delete(b.dataset.dev) : on.add(b.dataset.dev);
+    act(() => api("/api/group/devices", {json:{id:g.id, devices:[...on]}}));
+  });
+  root.querySelectorAll("[data-agroup]").forEach(b => b.onclick = () => {
+    const a = S.apps.find(x => x.id === b.dataset.agroup), on = new Set(a.groups);
+    on.has(b.dataset.g) ? on.delete(b.dataset.g) : on.add(b.dataset.g);
+    act(() => api("/api/app/groups", {json:{app:a.id, groups:[...on]}}));
+  });
+  root.querySelectorAll("[data-pgroup]").forEach(b => b.onclick = () => {
+    const i = pending.groups.indexOf(b.dataset.pgroup);
+    i >= 0 ? pending.groups.splice(i, 1) : pending.groups.push(b.dataset.pgroup);
+    render();
+  });
+  root.querySelectorAll("[data-rename]").forEach(b => b.onclick = () => {
+    const g = S.groups.find(x => x.id === b.dataset.rename), name = prompt("Rename group", g.name);
+    if (name && name.trim() && name.trim() !== g.name) act(() => api("/api/group/rename", {json:{id:g.id, name:name.trim()}}), "Renamed");
+  });
+  on("gaddf", "onsubmit", e => { e.preventDefault(); const name = $("#gname").value.trim(); if (!name) return;
+    act(async () => { await api("/api/group/add", {json:{name}}); $("#gname").value = ""; }, "Group added"); });
+  root.querySelectorAll("[data-mv]").forEach(b => b.onclick = () => act(() => api("/api/account/move", {json:{id:b.dataset.acc, direction:b.dataset.mv}})));
+  root.querySelectorAll("[id^=accon-]").forEach(el => el.onchange = () => act(() => api("/api/account/enable", {json:{id:el.id.slice(6), enabled:el.checked}})));
   root.querySelectorAll("[data-toggle]").forEach(b => b.onclick = () => {
     const a = S.apps.find(x => x.id === b.dataset.toggle), on = new Set(a.targets.map(t => t.udid));
     on.has(b.dataset.dev) ? on.delete(b.dataset.dev) : on.add(b.dataset.dev);
@@ -558,10 +618,18 @@ function wire() {
     if (confirmRemove !== id) { confirmRemove = id; render(); setTimeout(() => { if (confirmRemove === id) { confirmRemove = null; render(); } }, 4000); return; }
     confirmRemove = null;
     const [kind, key] = [id.slice(0, 4), id.slice(4)];
-    act(() => kind === "dev:" ? api("/api/device/remove", {json:{device:key}}) : api("/api/app/remove", {json:{id:key}}), "Removed");
+    act(async () => {
+      if (kind === "dev:") await api("/api/device/remove", {json:{device:key}});
+      else if (kind === "grp:") await api("/api/group/remove", {json:{id:key}});
+      else if (kind === "acc:") {
+        const r = await api("/api/account/remove", {json:{id:key}});
+        return toast(r.orphaned ? `Removed. ${plural(r.orphaned, "app")} it signed will get another Apple ID next time.` : "Removed");
+      } else await api("/api/app/remove", {json:{id:key}});
+      toast("Removed");
+    });
   });
-  on("aidf", "onsubmit", e => { e.preventDefault(); act(async () => { await api("/api/appleid", {json:{apple_id:$("#aid").value, password:$("#apw").value}}); $("#apw").value = ""; }, "Saved"); });
-  on("useipa", "onclick", () => act(async () => { await api("/api/ipa/use", {json:{filename:pending.filename, strip_extensions: !!pending.strip}}); pending = null; }, "App added"));
+  on("aidf", "onsubmit", e => { e.preventDefault(); act(async () => { await api("/api/account/save", {json:{apple_id:$("#aid").value, password:$("#apw").value}}); $("#aid").value = ""; $("#apw").value = ""; }, "Saved"); });
+  on("useipa", "onclick", () => act(async () => { await api("/api/ipa/use", {json:{filename:pending.filename, strip_extensions: !!pending.strip, groups: pending.groups}}); pending = null; }, "App added"));
   on("stripx", "onchange", e => { pending.strip = e.target.checked; });
   on("dropipa", "onclick", () => { pending = null; render(); });
   const drop = $("#drop"), file = $("#file");
@@ -584,7 +652,7 @@ function upload(f) {
   x.upload.onload = () => { txt.textContent = "Reading the app…"; };
   x.onload = () => {
     let r = {}; try { r = JSON.parse(x.responseText); } catch {}
-    if (x.status === 200) pending = {info: r.info, filename: f.name, strip: true}; else toast(r.error || `Upload failed (${x.status})`);
+    if (x.status === 200) pending = {info: r.info, filename: f.name, strip: true, groups: []}; else toast(r.error || `Upload failed (${x.status})`);
     render(); poll();
   };
   x.onerror = () => { toast("Upload failed"); render(); poll(); };
