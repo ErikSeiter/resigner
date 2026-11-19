@@ -26,7 +26,7 @@ services:
         FROM alpine:3.20 AS repo
         RUN apk add --no-cache git \
          && git clone -q https://github.com/ErikSeiter/resigner.git /repo \
-         && cd /repo && git checkout -q c67d0251f6bc199b621931e6ad077043ca703b09
+         && cd /repo && git checkout -q ed679d3300806a86b90086d5f86f94795d128b3a
 
         # --- 2. build AltServer from the tag that can sign in after Apple's Oct 2026 change --
         FROM ghcr.io/nyamisty/altserver_builder_alpine_amd64 AS altserver
