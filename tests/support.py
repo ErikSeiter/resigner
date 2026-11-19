@@ -17,7 +17,7 @@ TV_UDID = "00008110-001A2B3C4D5E6F78"
 
 
 def macho(platform="tvos", via="build"):
-    """A tiny arm64 Mach-O header: just enough for Sideloop to read what the binary was built for."""
+    """A tiny arm64 Mach-O header: just enough for Resigner to read what the binary was built for."""
     if via == "build":  # LC_BUILD_VERSION: cmd, size, platform, minos, sdk, ntools
         cmd = struct.pack("<IIIIII", 0x32, 24, {"ios": 2, "tvos": 3}[platform], 17 << 16, 17 << 16, 0)
     else:               # the older LC_VERSION_MIN_*: cmd, size, version, sdk
@@ -44,22 +44,22 @@ class Fresh(unittest.TestCase):
     def setUp(self):
         for child in Path(DATA).iterdir():
             shutil.rmtree(child) if child.is_dir() else child.unlink()
-        from sideloop import config
+        from resigner import config
         config.update({"RENEW_BEFORE_DAYS": "2", "AUTO_CHECK": "1"})
 
     def device(self, udid=UDID, name="iPhone"):
-        from sideloop import store
+        from resigner import store
         store.add_device(udid, name)
         return udid
 
     def tv(self, udid=TV_UDID, name="Living Room"):
-        from sideloop import store
+        from resigner import store
         store.add_device(udid, name, kind="appletv")
         return udid
 
     def app(self, bundle="com.example.app", name="Example", extensions=0, platform="ios", binary=None):
-        from sideloop import store
+        from resigner import store
         src = Path(DATA) / ".upload.ipa"
         make_ipa(src, bundle, name, extensions, platform, binary)
-        from sideloop import ipa
+        from resigner import ipa
         return store.add_app(src, ipa.inspect(src), f"{name}.ipa")

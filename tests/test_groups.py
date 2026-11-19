@@ -1,6 +1,6 @@
 import unittest
 
-from sideloop import store
+from resigner import store
 
 from .support import UDID, UDID2, Fresh
 

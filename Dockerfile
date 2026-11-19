@@ -52,11 +52,11 @@ RUN arch="$(uname -m)"; \
 
 COPY --from=altserver /AltServer /usr/local/bin/AltServer
 COPY scripts/ /usr/local/bin/
-COPY sideloop/ /opt/sideloop/
+COPY resigner/ /opt/resigner/
 
 ENV DATA_DIR=/data \
     PYTHONPATH=/opt \
     PYTHONUNBUFFERED=1
 WORKDIR /data
 EXPOSE 8080
-CMD ["python3", "-m", "sideloop"]
+CMD ["python3", "-m", "resigner"]

@@ -7,8 +7,8 @@
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Sideloop</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235ac8fa'/%3E%3Cstop offset='.55' stop-color='%23007aff'/%3E%3Cstop offset='1' stop-color='%235856d6'/%3E%3C/linearGradient%3E%3ClinearGradient id='gloss' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.22'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='115' fill='url%28%23bg%29'/%3E%3Crect width='512' height='512' rx='115' fill='url%28%23gloss%29'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='30' stroke-linecap='round'%3E%3Cpath d='M370.3 190A132 132 0 0 0 128 225'/%3E%3Cpath d='M141.7 322A132 132 0 0 0 384 287'/%3E%3C/g%3E%3Cg fill='%23fff' stroke='%23fff' stroke-width='10' stroke-linejoin='round'%3E%3Cpath d='M121 266L99 216L156 226Z'/%3E%3Cpath d='M391 246L413 296L356 286Z'/%3E%3C/g%3E%3Crect x='211' y='176' width='90' height='160' rx='22' fill='%23fff'/%3E%3Crect x='238' y='190' width='36' height='8' rx='4' fill='%23007aff' opacity='.55'/%3E%3Cpath d='M232 262l17 17 32-36' fill='none' stroke='%23007aff' stroke-width='16' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<title>Resigner</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235eead4'/%3E%3Cstop offset='.55' stop-color='%2314b8a6'/%3E%3Cstop offset='1' stop-color='%230f766e'/%3E%3C/linearGradient%3E%3ClinearGradient id='gloss' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.22'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='115' fill='url(%23bg)'/%3E%3Crect width='512' height='512' rx='115' fill='url(%23gloss)'/%3E%3Cpath d='M397 205A150 150 0 1 1 307 115' fill='none' stroke='%23fff' stroke-width='30' stroke-linecap='round'/%3E%3Cpath d='M319 83L345 129L296 147Z' fill='%23fff' stroke='%23fff' stroke-width='12' stroke-linejoin='round'/%3E%3Cpath d='M178 300C196 240 222 206 238 224C252 240 222 292 242 292C268 292 272 232 296 236C316 240 304 280 336 262' fill='none' stroke='%23fff' stroke-width='20' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M184 338H332' fill='none' stroke='%23fff' stroke-width='14' stroke-linecap='round' opacity='.85'/%3E%3C/svg%3E">
 <style>
 :root{
   --bg:#f2f2f7; --cell:#ffffff; --elev:#ffffff;
@@ -203,7 +203,7 @@ function dismiss(id) { dismissedJob = id; try { localStorage.setItem("dismissedJ
 const sheetJob = () => { const j = S && S.job; return j && j.id !== dismissedJob && (j.running || watched.has(j.id)) ? j : null; };
 
 async function api(path, opts={}) {
-  const o = {headers:{"X-Requested-With":"sideloop"}, ...opts};
+  const o = {headers:{"X-Requested-With":"resigner"}, ...opts};
   if (o.json !== undefined) { o.method = o.method || "POST"; o.body = JSON.stringify(o.json); o.headers["Content-Type"] = "application/json"; delete o.json; }
   const r = await fetch(path, o);
   const data = await r.json().catch(() => ({}));
@@ -242,7 +242,7 @@ async function boot() {
 function renderAuth(first) {
   root.innerHTML = `<div class="auth"><div class="box">
     <img class="logo" src="${document.querySelector('link[rel=icon]').href}" alt="">
-    <h1>${first ? "Create a Password" : "Sideloop"}</h1>
+    <h1>${first ? "Create a Password" : "Resigner"}</h1>
     <p>${first ? "This page holds your Apple ID, so it needs a password." : "Enter your password to continue."}</p>
     <form id="authf">
       <div class="list"><div class="cell"><input class="fi" style="text-align:left;color:var(--label)" id="pw" type="password" placeholder="${first ? "At least 8 characters" : "Password"}"
@@ -681,7 +681,7 @@ function upload(f) {
   const prog = $("#prog"), bar = $("#prog i"), txt = $("#progt");
   prog.classList.remove("hidden");
   const x = new XMLHttpRequest();
-  x.open("PUT", "/api/ipa"); x.setRequestHeader("X-Requested-With", "sideloop");
+  x.open("PUT", "/api/ipa"); x.setRequestHeader("X-Requested-With", "resigner");
   x.upload.onprogress = e => { if (e.lengthComputable) { bar.style.width = (e.loaded/e.total*100) + "%"; txt.textContent = `Uploading… ${Math.round(e.loaded/e.total*100)}%`; } };
   x.upload.onload = () => { txt.textContent = "Reading the app…"; };
   x.onload = () => {

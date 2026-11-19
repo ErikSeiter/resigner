@@ -7,7 +7,7 @@ index a3aa6e8..3d6e7dc 100755
  
  			/* Provisioning Profiles */			
 -			bool shouldManageProfiles = (activeProfiles.has_value() || (application->provisioningProfile() != NULL && application->provisioningProfile()->isFreeProvisioningProfile()));
-+			// sideloop: removing every free profile before installing makes iOS forget that the user
++			// resigner: removing every free profile before installing makes iOS forget that the user
 +			// trusted the developer, so ALTSERVER_KEEP_PROFILES leaves them in place.
 +			bool shouldManageProfiles = getenv("ALTSERVER_KEEP_PROFILES") == NULL && (activeProfiles.has_value() || (application->provisioningProfile() != NULL && application->provisioningProfile()->isFreeProvisioningProfile()));
  			if (shouldManageProfiles)

@@ -4,7 +4,7 @@ import struct
 import threading
 import unittest
 
-from sideloop import mdns
+from resigner import mdns
 
 
 def name(n):

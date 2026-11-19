@@ -6,7 +6,7 @@ import time
 import unittest
 from pathlib import Path
 
-from sideloop import accounts, config, store
+from resigner import accounts, config, store
 
 from .support import ROOT, TV_UDID, UDID, Fresh
 
@@ -47,9 +47,9 @@ class RefreshTV(Fresh):
                "TV_LOCATE_TRIES": str(tries)}
         env.pop("XDG_CONFIG_HOME", None)
         if locate:
-            env["SIDELOOP_TV_LOCATE"] = locate
+            env["RESIGNER_TV_LOCATE"] = locate
         else:
-            env.pop("SIDELOOP_TV_LOCATE", None)
+            env.pop("RESIGNER_TV_LOCATE", None)
         if servers:
             env["ANISETTE_SERVER"] = servers
         cmd = ["bash", str(ROOT / "scripts" / script), *(["--app", app] if app else []),

@@ -31,7 +31,7 @@ def _recv_exact(s, n):
 
 
 def _mux_request(s, msg, tag=1):
-    body = plistlib.dumps(dict(msg, ClientVersionString="sideloop", ProgName="sideloop"))
+    body = plistlib.dumps(dict(msg, ClientVersionString="resigner", ProgName="resigner"))
     s.sendall(struct.pack("<IIII", 16 + len(body), 1, 8, tag) + body)
     length = struct.unpack("<I", _recv_exact(s, 4))[0]
     _recv_exact(s, 12)
@@ -87,7 +87,7 @@ class Lockdown:
         self.sock = ctx.wrap_socket(self.sock)
 
     def _call(self, req):
-        body = plistlib.dumps(dict(req, Label="sideloop"))
+        body = plistlib.dumps(dict(req, Label="resigner"))
         self.sock.sendall(struct.pack(">I", len(body)) + body)
         return plistlib.loads(_recv_exact(self.sock, struct.unpack(">I", _recv_exact(self.sock, 4))[0]))
 

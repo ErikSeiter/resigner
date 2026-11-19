@@ -37,7 +37,7 @@ def fetch(url, dest, limit, sha256="", timeout=30):
     part = dest.with_name(dest.name + ".download")
     digest, size = hashlib.sha256(), 0
     try:
-        with urllib.request.build_opener(_Redirects).open(urllib.request.Request(url, headers={"User-Agent": "Sideloop"}), timeout=timeout) as r:
+        with urllib.request.build_opener(_Redirects).open(urllib.request.Request(url, headers={"User-Agent": "Resigner"}), timeout=timeout) as r:
             if int(r.headers.get("Content-Length") or 0) > limit:
                 raise ValueError("That file is too large")
             fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)

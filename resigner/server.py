@@ -12,7 +12,7 @@ from .jobs import redact, run_capture, run_pty
 from .watcher import configured
 
 INDEX = Path(__file__).with_name("index.html")
-COOKIE = "sideloop_session"
+COOKIE = "resigner_session"
 CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:"
 MAX_JSON = 1_000_000
 MAX_IPA = 4 * 1024 ** 3
@@ -321,7 +321,7 @@ def handler(app):
     routes = app.routes()
 
     class Handler(http.server.BaseHTTPRequestHandler):
-        server_version = "sideloop"
+        server_version = "resigner"
 
         def log_message(self, *args):
             pass
@@ -355,7 +355,7 @@ def handler(app):
             return False
 
         def same_origin(self):
-            return self.headers.get("X-Requested-With") == "sideloop"
+            return self.headers.get("X-Requested-With") == "resigner"
 
         def login(self, token="", max_age=auth.SESSION_TTL):
             cookie = f"{COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={max_age}"

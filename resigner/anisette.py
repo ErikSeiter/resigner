@@ -9,7 +9,7 @@ switching never disturbs the others.
 On disk:  data/state/anisette/last_good   the server that worked last
           data/state/anisette/bad/<key>   exists (touched) while a server is set aside
 
-The command line (python3 -m sideloop.anisette ...) is what scripts/refresh.sh uses:
+The command line (python3 -m resigner.anisette ...) is what scripts/refresh.sh uses:
   order        the servers to try, best first, one per line
   good URL     this one worked
   bad URL      this one failed
@@ -125,7 +125,7 @@ def _main(argv):
             print(problem)
         sys.exit(0 if problem else 1)
     else:
-        sys.exit("usage: python3 -m sideloop.anisette order|good URL|bad URL|check")
+        sys.exit("usage: python3 -m resigner.anisette order|good URL|bad URL|check")
 
 
 if __name__ == "__main__":

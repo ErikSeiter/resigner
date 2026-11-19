@@ -19,7 +19,7 @@ def main():
     watcher = Watcher(jobs, health)
     health.on_arrival = watcher.poke
 
-    log(f"sideloop ({MUX} mux) on :{PORT}, data in {DATA}")
+    log(f"resigner ({MUX} mux) on :{PORT}, data in {DATA}")
     if muxers:
         muxers.start()
     threading.Thread(target=health.loop, daemon=True).start()

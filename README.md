@@ -1,33 +1,24 @@
 <div align="center">
-  <a href="https://github.com/ErikSeiter/sideloop-nas">
-    <img width="140px" src=".github/logo.png" alt="Sideloop" />
-  </a>
-  <h3 align="center">Sideloop for NAS (fixed for Apple's Oct 2026 sign-in)</h3>
+  <img width="140px" src=".github/logo.png" alt="Resigner" />
+  <h3 align="center">Resigner</h3>
+  <p align="center">Keeps your sideloaded iPhone, iPad and Apple TV apps alive by re-signing them from your NAS.</p>
 </div>
 
-> Keep sideloaded IPAs signed with a free Apple ID, re-installed over Wi-Fi before the 7-day signature expires.
+> A free Apple ID signs an app for only 7 days. Resigner signs your IPAs with that Apple ID and installs them again over Wi-Fi before the signature runs out, so the apps keep working and keep their data.
 
-This is a fork of [filippofinke/sideloop](https://github.com/filippofinke/sideloop) (MIT) that **signs in again after Apple's October 2026 changes** and comes with a step-by-step guide for running it on a **NAS** (written and tested on a UGREEN DXP4800 running UGOS Pro).
+A small self-hosted service with a web UI for a **NAS** (written and tested on a UGREEN DXP4800 running UGOS Pro), any Linux machine (amd64 or arm64) or a Mac. It re-signs your apps with [AltServer-Linux](https://github.com/jaakkopalvaila/AltServer-Linux) and installs them in place. You don't need AltStore or SideStore on the device.
 
 | Guide | |
 | --- | --- |
 | [UGREEN NAS (UGOS Pro) setup guide](docs/UGOS-NAS-GUIDE.md) | From an empty Docker app to an installed app on your iPhone |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Every Apple / AltServer error we hit, with the fix |
 
-### What is different from upstream
+### Highlights
 
-| Problem | Upstream | This fork |
-| --- | --- | --- |
-| Apple sign-in fails with `-22411`, `-80045`, `-80046` | Builds the September AltServer tag | Builds AltServer tag `ng-2026-11-05`, which provisions its own anisette identity per install |
-| Anisette server | Local `dadoum/anisette-v3-server` container | A public v3 server by default (`ANISETTE_SERVER`); the local one is an optional compose profile |
-| Install fails with `Failed to set app extension placeholders` | Only warns that extensions use extra App IDs | **Remove App Extensions** switch when you add an IPA (on by default); the original is kept as `app.orig.ipa` |
-| "Sign-in helper isn't running" with a public server | Any non-200 answer counts as down | Any HTTP answer counts as up |
-| NAS deployment | None | Single-file compose for UGOS Docker: [`nas/docker-compose.ugos.yml`](nas/docker-compose.ugos.yml) |
-| Apple TV | iPhone and iPad only | **tvOS 17+ Apple TVs** are paired with a PIN from the web page and get tvOS apps signed and installed over Wi-Fi (see [Apple TV](#apple-tv)) |
-
-Everything else, including the two AltServer patches, is upstream's.
-
-A small self-hosted service with a web UI for any Linux machine (amd64 or arm64) or a Mac. It re-signs your apps with [AltServer-Linux](https://github.com/jaakkopalvaila/AltServer-Linux) and installs them in place, so app data is kept. You don't need AltStore or SideStore on the device.
+- **Apple sign-in that works after Apple's October 2026 changes.** The image builds AltServer tag `ng-2026-11-05`, which provisions its own anisette identity per install. A public anisette v3 server is used by default (`ANISETTE_SERVER`); a local one is an optional compose profile.
+- **Apps with extensions install on a free Apple ID.** The *Remove App Extensions* switch (on by default when you add an IPA) strips them; the original is kept as `app.orig.ipa`.
+- **Made for a NAS.** One compose file for the UGOS Docker app: [`nas/docker-compose.ugos.yml`](nas/docker-compose.ugos.yml).
+- **Apple TV.** tvOS 17+ Apple TVs are paired with a PIN from the web page and get tvOS apps signed and installed over Wi-Fi (see [Apple TV](#apple-tv)).
 
 ## Features
 
@@ -41,12 +32,6 @@ A small self-hosted service with a web UI for any Linux machine (amd64 or arm64)
 - [x] **Several Apple IDs** in a priority order: a new app is signed with the first Apple ID that still has room and the next one takes over when Apple says the limit is reached. An installed app always stays with the Apple ID that signed it
 - [x] **Apple TV** (tvOS 17 and newer): pair it once with the PIN the TV shows, then tvOS apps are re-signed like the ones on your iPhone. iPhones and iPads keep using AltServer; the Apple TV path never touches them
 - [x] Python standard library only, one Docker image for amd64 and arm64
-
-## Demo (upstream)
-
-https://github.com/user-attachments/assets/8c6b799d-b9e7-4a15-898d-d96a2af8e876
-
-A two-minute narrated walkthrough: setup, adding devices and apps, the first install with a 2FA code, and automatic re-signing.
 
 ## Screenshots
 
@@ -70,8 +55,8 @@ Prerequisites
 Run on Linux
 
 ```bash
-git clone https://github.com/ErikSeiter/sideloop-nas.git
-cd sideloop-nas
+git clone https://github.com/ErikSeiter/resigner.git
+cd resigner
 cp .env.example .env
 docker compose up -d
 ```
@@ -79,9 +64,9 @@ docker compose up -d
 The first build compiles AltServer, which takes a few minutes. On a small board like a Raspberry Pi 3 it is much faster to build on another arm64 machine and copy the image over:
 
 ```bash
-docker build --platform linux/arm64 -t sideloop .
-docker save sideloop | gzip | ssh pi@<host> 'gunzip | docker load'
-ssh pi@<host> 'cd sideloop && docker compose up -d --no-build'
+docker build --platform linux/arm64 -t resigner .
+docker save resigner | gzip | ssh pi@<host> 'gunzip | docker load'
+ssh pi@<host> 'cd resigner && docker compose up -d --no-build'
 ```
 
 Open `http://<host>:8080` and set a password. Then pair a device over USB, add an IPA and enter your Apple ID.
@@ -101,18 +86,18 @@ Pair the device in Finder and enable **Show this iPhone when on Wi-Fi**.
 
 ## Apple TV
 
-An Apple TV with tvOS 17 or newer is not reached like an iPhone: it has no USB or lockdown service for this, it is paired once with a PIN and then found on the network. Sideloop uses [plumesign](https://github.com/bitxeno/PlumeImpactor) (MIT) for that part. The Docker image downloads a pinned release and checks its SHA-256; if that fails the image is still built, only without Apple TV support, and the web page says so.
+An Apple TV with tvOS 17 or newer is not reached like an iPhone: it has no USB or lockdown service for this, it is paired once with a PIN and then found on the network. Resigner uses [plumesign](https://github.com/bitxeno/PlumeImpactor) (MIT) for that part. The Docker image downloads a pinned release and checks its SHA-256; if that fails the image is still built, only without Apple TV support, and the web page says so.
 
-1. Put the Apple TV and the machine running Sideloop on the **same network** (same subnet, no guest Wi-Fi, no client isolation). Sideloop has to run with `network_mode: host`, as in the compose files.
+1. Put the Apple TV and the machine running Resigner on the **same network** (same subnet, no guest Wi-Fi, no client isolation). Resigner has to run with `network_mode: host`, as in the compose files.
 2. On the Apple TV open **Settings > Remotes and Devices > Remote App and Devices**. It waits there and shows a PIN when something asks to pair.
-3. In Sideloop open **Settings**, press **Pair Apple TV…**, choose the TV in the list and type the PIN it shows when the page asks for it.
-4. Add a **tvOS** `.ipa` the usual way (upload it, or paste a link to it and the server downloads it). Sideloop reads what the app's binary was built for (some tvOS builds claim iOS in their Info.plist), shows *Apple TV app* and only offers it to Apple TVs; iPhone apps are never offered to an Apple TV. A new Apple TV joins an empty group that only holds tvOS apps; otherwise it gets the tvOS apps that aren't tied to a group.
+3. In Resigner open **Settings**, press **Pair Apple TV…**, choose the TV in the list and type the PIN it shows when the page asks for it.
+4. Add a **tvOS** `.ipa` the usual way (upload it, or paste a link to it and the server downloads it). Resigner reads what the app's binary was built for (some tvOS builds claim iOS in their Info.plist), shows *Apple TV app* and only offers it to Apple TVs; iPhone apps are never offered to an Apple TV. A new Apple TV joins an empty group that only holds tvOS apps; otherwise it gets the tvOS apps that aren't tied to a group.
 5. Press **Install** next to it. The first sign-in of an Apple ID for the Apple TV needs a 2FA code, entered on the web page (a free Apple ID is signed in separately for iOS and for tvOS, so an Apple ID that already works for your iPhone still asks once). After that the Apple TV is re-signed automatically when it is on and on the network.
 
 Limits and things to know:
 
 - Only **tvOS 17 and newer**, and only apps built for tvOS. The same free-account limits apply (3 apps per device, 10 App IDs per week).
-- The Apple TV has to be **on and awake on the network** for a re-sign; if it isn't, Sideloop waits and tries again later.
+- The Apple TV has to be **on and awake on the network** for a re-sign; if it isn't, Resigner waits and tries again later.
 - A **tvOS update can drop the pairing**. Pair again from the web page if the TV stops being found.
 - Switching off *Automatically Update tvOS* (Settings > System > Software Updates) avoids surprises.
 - A different Apple ID is a different developer team, so an app stays with the Apple ID that signed it.
@@ -124,7 +109,7 @@ Limits and things to know:
 - Apple asks for a **2FA code** on the first sign-in. Enter it in the web UI (the background re-signer can't answer it). After that, sign-ins are normally silent.
 - The device must be **unlocked and on the same Wi-Fi** while a re-sign runs.
 - A free account allows 3 apps per device and 10 App IDs per week. Each app extension needs its own App ID.
-- **Several Apple IDs:** add them under *Apple IDs* in Settings and order them with the arrows. The switch decides whether an Apple ID takes *new* apps; it never strands what it already signed. Sideloop counts the apps and App IDs it has signed per Apple ID as a hint, and treats Apple's "limit reached" answer as the real signal to try the next one. All Apple IDs share one anisette identity (it belongs to the install, not to an Apple ID). Each Apple ID is a separate developer for iOS, so trust each one once under **VPN & Device Management**. The first install with a new Apple ID needs a 2FA code, so a background run only picks an Apple ID that has signed something before; start that install from the web page.
+- **Several Apple IDs:** add them under *Apple IDs* in Settings and order them with the arrows. The switch decides whether an Apple ID takes *new* apps; it never strands what it already signed. Resigner counts the apps and App IDs it has signed per Apple ID as a hint, and treats Apple's "limit reached" answer as the real signal to try the next one. All Apple IDs share one anisette identity (it belongs to the install, not to an Apple ID). Each Apple ID is a separate developer for iOS, so trust each one once under **VPN & Device Management**. The first install with a new Apple ID needs a 2FA code, so a background run only picks an Apple ID that has signed something before; start that install from the web page.
 - **Groups:** an app tied to one or more groups reaches exactly the devices in them. Deleting a group leaves its apps where they are; apps that followed no other group then go back to following new devices.
 - Trust the developer once in **Settings > General > VPN & Device Management**. Refreshes keep it trusted.
 - If Apple sign-in stops working, check for a newer tag at [jaakkopalvaila/AltServer-Linux](https://github.com/jaakkopalvaila/AltServer-Linux/tags) and update `ALTSERVER_TAG` in the `Dockerfile`. AltServer is built from that tag with the patches in `altserver/`. See [Troubleshooting](docs/TROUBLESHOOTING.md) for the error codes.
@@ -140,29 +125,16 @@ python3 -m unittest discover -s tests -t .
 
 The tests run `scripts/refresh.sh` and `scripts/refresh-tv.sh` against stand-ins for AltServer, plumesign and the libimobiledevice tools (`tests/stubs/`), so they need `bash`, `openssl`, `flock` and `script` but no phone, no Apple TV and no Apple ID.
 
-## Credits
+## Built with
 
-Sideloop is by **Filippo Finke**; AltServer-Linux is by [jaakkopalvaila](https://github.com/jaakkopalvaila/AltServer-Linux) (a fork of [NyaMisty](https://github.com/NyaMisty/AltServer-Linux)). Apple TV signing is done by `plumesign` from [PlumeImpactor](https://github.com/bitxeno/PlumeImpactor) (MIT). [atvloadly](https://github.com/bitxeno/atvloadly) (AGPL-3.0) showed how that tool is driven; none of its code is used here. This fork only adds the changes listed above.
+- [AltServer-Linux](https://github.com/jaakkopalvaila/AltServer-Linux) by jaakkopalvaila, a fork of [NyaMisty's AltServer-Linux](https://github.com/NyaMisty/AltServer-Linux): signs and installs the iPhone and iPad apps (patched in `altserver/`).
+- [plumesign](https://github.com/bitxeno/PlumeImpactor) from PlumeImpactor (MIT): signs and installs the Apple TV apps. [atvloadly](https://github.com/bitxeno/atvloadly) (AGPL-3.0) showed how that tool is driven; none of its code is used here.
+- Any anisette v3 server, for example [anisette-v3-server](https://github.com/Dadoum/anisette-v3-server).
+- Icons from [Ionicons](https://ionic.io/ionicons) (MIT).
 
-👤 **Filippo Finke** (upstream author)
+## License
 
-- Website: [https://filippofinke.ch](https://filippofinke.ch)
-- Twitter: [@filippofinke](https://twitter.com/filippofinke)
-- GitHub: [@filippofinke](https://github.com/filippofinke)
-- LinkedIn: [@filippofinke](https://linkedin.com/in/filippofinke)
-
-## Support the upstream author
-
-Give [the original project](https://github.com/filippofinke/sideloop) a ⭐️ if this helped you!
-
-<a href="https://www.buymeacoffee.com/filippofinke">
-  <img src="https://github.com/filippofinke/filippofinke/raw/main/images/buymeacoffe.png" alt="Buy Me A McFlurry">
-</a>
-
-## 📝 License
-
-Copyright © 2026 [Filippo Finke](https://github.com/filippofinke).<br />
-This project is [MIT](./LICENSE) licensed. Icons from [Ionicons](https://ionic.io/ionicons) (MIT).
+Copyright © 2026 Erik Seiter. [MIT](./LICENSE) licensed; the licence file also carries the copyright notice of the code this project started from.
 
 ***
 

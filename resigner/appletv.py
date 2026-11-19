@@ -9,7 +9,7 @@ plumesign for the pairing, and tells scripts/refresh-tv.sh where the TV is and w
 plumesign keeps everything in $XDG_CONFIG_HOME/PlumeImpactor: accounts.json (the Apple ID sessions),
 anisette/<account> (one identity per Apple ID) and pairing_files/<udid>.plist (+ .json with the TV's name).
 
-The command line (python3 -m sideloop.appletv ...) is what scripts/refresh-tv.sh uses:
+The command line (python3 -m resigner.appletv ...) is what scripts/refresh-tv.sh uses:
   locate UDID    prints "<ip> <port>" of that Apple TV, exit 1 when it isn't on the network
   profile FILE   prints "<expiry epoch> <certificate sha1>" of a provisioning profile
 """
@@ -118,7 +118,7 @@ def pairable(timeout=SCAN_TIME):
 
 
 def locate(udid, timeout=SCAN_TIME):
-    fixed = os.environ.get("SIDELOOP_TV_LOCATE", "").split()  # "<ip> <port>": for tests and debugging
+    fixed = os.environ.get("RESIGNER_TV_LOCATE", "").split()  # "<ip> <port>": for tests and debugging
     if len(fixed) == 2:
         return fixed[0], int(fixed[1])
     for d in scan_live([udid], timeout):
@@ -208,7 +208,7 @@ def _main(argv):
             sys.exit(1)
         print(*info)
     else:
-        sys.exit("usage: python3 -m sideloop.appletv locate UDID|profile FILE")
+        sys.exit("usage: python3 -m resigner.appletv locate UDID|profile FILE")
 
 
 if __name__ == "__main__":

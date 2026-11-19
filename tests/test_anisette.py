@@ -2,7 +2,7 @@ import time
 import unittest
 from pathlib import Path
 
-from sideloop import anisette, config
+from resigner import anisette, config
 
 from .support import Fresh
 

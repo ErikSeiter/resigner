@@ -4,9 +4,9 @@ import threading
 import unittest
 from pathlib import Path
 
-from sideloop import config, download
-from sideloop.jobs import Jobs
-from sideloop.server import App
+from resigner import config, download
+from resigner.jobs import Jobs
+from resigner.server import App
 
 from .support import Fresh, make_ipa
 from .test_server import FakeHealth

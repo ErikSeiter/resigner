@@ -8,9 +8,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from sideloop import accounts, appletv, devices, ipa, store
-from sideloop.jobs import Job, Jobs
-from sideloop.server import App
+from resigner import accounts, appletv, devices, ipa, store
+from resigner.jobs import Job, Jobs
+from resigner.server import App
 
 from .support import ROOT, TV_UDID, UDID, Fresh, make_ipa
 
@@ -189,7 +189,7 @@ class Accounts(Fresh):
 class Finding(WithStub):
     def test_a_registered_tv_is_found_when_it_announces_itself(self):
         tv = self.tv()
-        with mock.patch.dict(os.environ, {"STUB_TV_UDID": tv}), mock.patch("sideloop.mdns.browse", return_value=[svc()]):
+        with mock.patch.dict(os.environ, {"STUB_TV_UDID": tv}), mock.patch("resigner.mdns.browse", return_value=[svc()]):
             found = appletv.scan_live()
         self.assertEqual([(d["udid"], d["ip"], d["port"], d["kind"]) for d in found],
                          [(tv, "192.168.1.50", 49152, "appletv")])
@@ -197,35 +197,35 @@ class Finding(WithStub):
 
     def test_an_iphone_announcing_the_same_service_is_not_a_tv(self):
         self.tv()
-        with mock.patch("sideloop.mdns.browse", return_value=[svc()]):
+        with mock.patch("resigner.mdns.browse", return_value=[svc()]):
             self.assertEqual(appletv.scan_live(), [])  # the stub finds no pairing file for it
 
     def test_a_tv_that_is_not_registered_is_ignored(self):
-        with mock.patch.dict(os.environ, {"STUB_TV_UDID": TV_UDID}), mock.patch("sideloop.mdns.browse", return_value=[svc()]) as m:
+        with mock.patch.dict(os.environ, {"STUB_TV_UDID": TV_UDID}), mock.patch("resigner.mdns.browse", return_value=[svc()]) as m:
             self.assertEqual(appletv.scan_live(), [])
         m.assert_not_called()  # nothing to look for, so no network traffic either
 
     def test_the_answer_for_an_announcement_is_remembered(self):
         tv = self.tv()
-        with mock.patch.dict(os.environ, {"STUB_TV_UDID": tv}), mock.patch("sideloop.mdns.browse", return_value=[svc()]):
+        with mock.patch.dict(os.environ, {"STUB_TV_UDID": tv}), mock.patch("resigner.mdns.browse", return_value=[svc()]):
             appletv.scan_live()
             (self.stub / "marker").write_text("x")
-            with mock.patch("sideloop.appletv._run", side_effect=AssertionError("asked twice")):
+            with mock.patch("resigner.appletv._run", side_effect=AssertionError("asked twice")):
                 self.assertEqual(len(appletv.scan_live()), 1)
 
     def test_locate_gives_the_address(self):
         tv = self.tv()
-        with mock.patch.dict(os.environ, {"STUB_TV_UDID": tv}), mock.patch("sideloop.mdns.browse", return_value=[svc(ip="10.0.0.7", port=5000)]):
+        with mock.patch.dict(os.environ, {"STUB_TV_UDID": tv}), mock.patch("resigner.mdns.browse", return_value=[svc(ip="10.0.0.7", port=5000)]):
             self.assertEqual(appletv.locate(tv), ("10.0.0.7", 5000))
 
     def test_locate_says_so_when_the_tv_is_away(self):
         tv = self.tv()
-        with mock.patch("sideloop.mdns.browse", return_value=[]):
+        with mock.patch("resigner.mdns.browse", return_value=[]):
             self.assertIsNone(appletv.locate(tv))
 
     def test_the_tvs_waiting_for_a_pin_are_listed_once(self):
         found = [svc(), svc(), svc(ip="192.168.1.51", name="Bedroom")]
-        with mock.patch("sideloop.mdns.browse", return_value=found) as m:
+        with mock.patch("resigner.mdns.browse", return_value=found) as m:
             tvs = appletv.pairable()
         self.assertEqual([(t["name"], t["ip"], t["port"]) for t in tvs],
                          [("Living Room", "192.168.1.50", 49152), ("Bedroom", "192.168.1.51", 49152)])
@@ -359,7 +359,7 @@ class Server(WithStub):
             self.assertEqual(self.api.state()["appletv"], {"available": False})
 
     def test_discover_lists_the_tvs_showing_a_pin(self):
-        with mock.patch("sideloop.mdns.browse", return_value=[svc()]):
+        with mock.patch("resigner.mdns.browse", return_value=[svc()]):
             self.assertEqual(self.routes["/api/appletv/discover"]({}),
                              {"tvs": [{"name": "Living Room", "ip": "192.168.1.50", "port": 49152}]})
 

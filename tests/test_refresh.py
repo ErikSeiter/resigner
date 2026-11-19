@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from sideloop import accounts, anisette, config, store
+from resigner import accounts, anisette, config, store
 
 from .support import ROOT, UDID, Fresh
 

@@ -1,7 +1,7 @@
 """Apple ID accounts.
 
 Several free Apple IDs can be added in a priority order. A new app (or an app on a new device) is signed with
-the first account that still has room; Sideloop remembers which account signed each app on each device and always
+the first account that still has room; Resigner remembers which account signed each app on each device and always
 re-signs it with that same account, because a different Apple ID means a different team and App ID, and iOS would
 treat the result as another app.
 
@@ -12,7 +12,7 @@ On disk, per account:  data/accounts/<id>/account.env   credentials, priority, c
                        data/accounts/<id>/exhausted     touched when Apple said this account is out of signings
 and per installed app:  data/apps/<app>/state/<udid>/account   the account that signed it
 
-The command line (python3 -m sideloop.accounts ...) is what scripts/refresh.sh uses.
+The command line (python3 -m resigner.accounts ...) is what scripts/refresh.sh uses.
 """
 import os
 import re
@@ -110,7 +110,7 @@ def save(apple_id, password=None):
     m["APPLE_ID"] = apple_id
     _write(aid, m)
     if m.get("LEGACY") == "1":
-        # an older Sideloop reads these from config.env; keep them right in case the image is rolled back
+        # an older Resigner reads these from config.env; keep them right in case the image is rolled back
         config.update({"APPLE_ID": apple_id, "APPLE_PASSWORD": m["APPLE_PASSWORD"]})
     return aid
 
@@ -228,7 +228,7 @@ def _app_ids_needed(app_id):
 
 
 def room(aid, app_id, udid, now=None):
-    """Whether Sideloop's own records say this account can take one more app on this device. Only a hint:
+    """Whether Resigner's own records say this account can take one more app on this device. Only a hint:
     Apple has the final say, and the account may be used by other tools too."""
     if is_exhausted(aid, now):
         return False
@@ -300,7 +300,7 @@ def _main(argv):
     elif cmd == "limit":
         sys.exit(0 if LIMIT_RE.search(sys.stdin.read()) else 1)
     else:
-        sys.exit("usage: python3 -m sideloop.accounts pick|record|exhausted|limit")
+        sys.exit("usage: python3 -m resigner.accounts pick|record|exhausted|limit")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ index 3d6e7dc..fa687d7 100755
  	odslog("Writing File: " << filepath.c_str() << " to: " << destinationPath.c_str());
      
 -    auto data = readFile(filepath.c_str());
-+    // sideloop: stream the file in 1 MB chunks. readFile copies byte by byte, which takes long
++    // resigner: stream the file in 1 MB chunks. readFile copies byte by byte, which takes long
 +    // enough for a large binary (Spotify is 175 MB) that the device drops the idle connection,
 +    // and afc_file_write sends its whole buffer as one packet that times out over Wi-Fi.
 +    std::ifstream file(filepath, std::ios::binary);

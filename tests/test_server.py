@@ -3,9 +3,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from sideloop import accounts, anisette, config, store
-from sideloop.jobs import Job, Jobs
-from sideloop.server import App, run_refresh
+from resigner import accounts, anisette, config, store
+from resigner.jobs import Job, Jobs
+from resigner.server import App, run_refresh
 
 from .support import UDID, UDID2, Fresh
 

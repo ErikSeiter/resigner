@@ -11,7 +11,7 @@ ALTSERVER_BIN="${ALTSERVER_BIN:-/usr/local/bin/AltServer}"
 [[ -r "$CONFIG" ]] || { echo "missing config: $CONFIG" >&2; exit 78; }
 set -a; . "$CONFIG"; set +a
 # Apple IDs live in $DATA_DIR/accounts (several, in priority order); the pair in config.env is only a copy
-# for older versions. Which one signs an app is decided per run by `python3 -m sideloop.accounts pick`.
+# for older versions. Which one signs an app is decided per run by `python3 -m resigner.accounts pick`.
 unset APPLE_ID APPLE_PASSWORD
 ACCOUNTS_DIR="$DATA_DIR/accounts"
 : "${RENEW_BEFORE_DAYS:=2}"
@@ -73,7 +73,7 @@ LOG_FILE="$STATE_DIR/refresh.log"
 NOISE='^(Signing|Installation) Progress:|^Writing File: |^Signing: |^(Data|Value) ?: |^X-(Apple|Mme|MMe)-|^(MachineID|One-Time Password|Local User ID|Device UDID|Device Description|Date|Sanitized client info) ?:|^Byte:|^(HMAC_OUT|NP):|anisette|^Received (auth )?response status code'
 
 # Anisette servers to try (ANISETTE_SERVER may list several): the one that worked last comes first.
-mapfile -t ANI_SERVERS < <(ANISETTE_SERVER="$ANISETTE_SERVER" python3 -m sideloop.anisette order 2>/dev/null)
+mapfile -t ANI_SERVERS < <(ANISETTE_SERVER="$ANISETTE_SERVER" python3 -m resigner.anisette order 2>/dev/null)
 (( ${#ANI_SERVERS[@]} )) || ANI_SERVERS=("${ANISETTE_SERVER%%[, ]*}")
 # Stock AltServer removes every free provisioning profile on the device before installing. Once the
 # last profile of a developer is gone iOS forgets that the user trusted it, so every refresh brought
@@ -291,7 +291,7 @@ PREVIOUS=""
 [[ -r "$APP_STATE/account" ]] && PREVIOUS="$(tr -d '[:space:]' < "$APP_STATE/account")"
 pick_args=(--app "$APP" --device "$DEVICE_UDID")
 (( INTERACTIVE )) && pick_args+=(--interactive)
-if ! CANDIDATES="$(python3 -m sideloop.accounts pick "${pick_args[@]}")"; then
+if ! CANDIDATES="$(python3 -m resigner.accounts pick "${pick_args[@]}")"; then
   log "ERROR could not choose an Apple ID"; record fail "could not choose an Apple ID"; exit 1
 fi
 if [[ -z "$CANDIDATES" ]]; then
@@ -330,8 +330,8 @@ for ACCOUNT in $CANDIDATES; do
     fi
     set -e
     # A problem with the anisette server itself (not with the Apple ID): set it aside and try the next one.
-    if (( rc != 0 && ! INTERACTIVE )) && problem="$(python3 -m sideloop.anisette check < "$out")"; then
-      python3 -m sideloop.anisette bad "$ANI" || true
+    if (( rc != 0 && ! INTERACTIVE )) && problem="$(python3 -m resigner.anisette check < "$out")"; then
+      python3 -m resigner.anisette bad "$ANI" || true
       if (( si + 1 < n_ani )); then
         log "Anisette server $ANI failed ($problem); trying ${ANI_SERVERS[si + 1]}"
         continue
@@ -341,8 +341,8 @@ for ACCOUNT in $CANDIDATES; do
   done
 
   if (( rc == 0 )) && stamp_success; then
-    python3 -m sideloop.accounts record --app "$APP" --device "$DEVICE_UDID" --account "$ACCOUNT" || true
-    python3 -m sideloop.anisette good "$ANI" || true
+    python3 -m resigner.accounts record --app "$APP" --device "$DEVICE_UDID" --account "$ACCOUNT" || true
+    python3 -m resigner.anisette good "$ANI" || true
     msg="refreshed, valid until $(fmt_epoch "$(cat "$EXPIRY")")"
     if [[ "$PREVIOUS" != "$ACCOUNT" ]]; then
       log "NOTE signed with $APPLE_ID. If iOS says Untrusted Developer, trust it in Settings > General > VPN & Device Management"
@@ -355,9 +355,9 @@ for ACCOUNT in $CANDIDATES; do
 
   # Apple refusing because this account has used up its signings: another account can take a new app. An app
   # that is already installed has to stay with the account that signed it.
-  if (( rc != 0 )) && [[ -z "$PREVIOUS" || "$PREVIOUS" != "$ACCOUNT" ]] && python3 -m sideloop.accounts limit < "$out"; then
+  if (( rc != 0 )) && [[ -z "$PREVIOUS" || "$PREVIOUS" != "$ACCOUNT" ]] && python3 -m resigner.accounts limit < "$out"; then
     LIMIT_FOUND="$ACCOUNT"
-    python3 -m sideloop.accounts exhausted --account "$ACCOUNT" || true
+    python3 -m resigner.accounts exhausted --account "$ACCOUNT" || true
     if (( n_left > 0 )); then
       log "$APPLE_ID has no signings left ($(tr '\r' '\n' < "$out" | grep -iE 'maximum|limit|too many' | head -n1 | cut -c1-160)); trying the next Apple ID"
       continue
@@ -372,7 +372,7 @@ if (( rc == 0 )); then
   hint="AltServer finished, but the app isn't on the device (did it lock or leave Wi-Fi mid-copy?)"
 elif [[ -n "$LIMIT_FOUND" ]]; then
   hint="Apple says every available Apple ID is out of signings; add another one or wait (a free Apple ID allows 3 apps per device and 10 App IDs a week)"
-elif (( ! INTERACTIVE )) && python3 -m sideloop.anisette check < "$out" > /dev/null; then
+elif (( ! INTERACTIVE )) && python3 -m resigner.anisette check < "$out" > /dev/null; then
   hint="the sign-in helper (Anisette server) failed${ANI_SERVERS[1]:+ on every server}; try again in a few minutes, or list more servers in ANISETTE_SERVER"
 elif grep -qiE 'two.?factor code|verification code' "$out"; then
   hint="Apple is asking for a 2FA code; sign it from the web UI once"

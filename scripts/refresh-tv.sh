@@ -54,7 +54,7 @@ mkdir -p "$STATE_DIR" "$APP_STATE" "$XDG_CONFIG_HOME"
 cd "$DATA_DIR"
 
 # Anisette servers to try (ANISETTE_SERVER may list several): the one that worked last comes first.
-mapfile -t ANI_SERVERS < <(ANISETTE_SERVER="$ANISETTE_SERVER" python3 -m sideloop.anisette order 2>/dev/null)
+mapfile -t ANI_SERVERS < <(ANISETTE_SERVER="$ANISETTE_SERVER" python3 -m resigner.anisette order 2>/dev/null)
 (( ${#ANI_SERVERS[@]} )) || ANI_SERVERS=("${ANISETTE_SERVER%%[, ]*}")
 
 now() { date +%s; }
@@ -102,7 +102,7 @@ fi
 # Where is the Apple TV right now? It announces itself on the network; asleep or off it doesn't.
 TV_IP=""; TV_PORT=""
 for (( _try = 0; _try < ${TV_LOCATE_TRIES:-3}; _try++ )); do
-  if found="$(python3 -m sideloop.appletv locate "$DEVICE_UDID" 2>/dev/null)"; then
+  if found="$(python3 -m resigner.appletv locate "$DEVICE_UDID" 2>/dev/null)"; then
     read -r TV_IP TV_PORT <<< "$found"
     break
   fi
@@ -121,7 +121,7 @@ PREVIOUS=""
 [[ -r "$APP_STATE/account" ]] && PREVIOUS="$(tr -d '[:space:]' < "$APP_STATE/account")"
 pick_args=(--app "$APP" --device "$DEVICE_UDID")
 (( INTERACTIVE )) && pick_args+=(--interactive)
-if ! CANDIDATES="$(python3 -m sideloop.accounts pick "${pick_args[@]}")"; then
+if ! CANDIDATES="$(python3 -m resigner.accounts pick "${pick_args[@]}")"; then
   log "ERROR could not choose an Apple ID"; record fail "could not choose an Apple ID"; exit 1
 fi
 if [[ -z "$CANDIDATES" ]]; then
@@ -208,7 +208,7 @@ for ACCOUNT in $CANDIDATES; do
     # A session that was lost (or never made): sign in again with the stored password, once. Works without a code
     # when Apple still trusts this install; otherwise the person has to do it from the web page.
     if (( rc != 0 && ! logged_in && ! INTERACTIVE )) && grep -qiE "Account '[^']*' not found|Request to developer session failed|Authentication extra step required|session[^\n]{0,40}(expired|invalid)|invalid[^\n]{0,20}(session|token)" "$out" \
-        && ! python3 -m sideloop.anisette check < "$out" > /dev/null; then
+        && ! python3 -m resigner.anisette check < "$out" > /dev/null; then
       log "the sign-in for $APPLE_ID is gone; signing in again"
       logged_in=1
       if login_account "$APPLE_ID" "$APPLE_PASSWORD"; then
@@ -217,8 +217,8 @@ for ACCOUNT in $CANDIDATES; do
       fi
     fi
     tr '\r' '\n' < "$out" | grep -vE "$NOISE" | cut -c1-400 >> "$LOG_FILE" || true
-    if (( rc != 0 && ! INTERACTIVE )) && problem="$(python3 -m sideloop.anisette check < "$out")"; then
-      python3 -m sideloop.anisette bad "$ANI" || true
+    if (( rc != 0 && ! INTERACTIVE )) && problem="$(python3 -m resigner.anisette check < "$out")"; then
+      python3 -m resigner.anisette bad "$ANI" || true
       if (( si + 1 < n_ani )); then
         log "Anisette server $ANI failed ($problem); trying ${ANI_SERVERS[si + 1]}"
         continue
@@ -228,14 +228,14 @@ for ACCOUNT in $CANDIDATES; do
   done
 
   if (( rc == 0 )) && installed_ok; then
-    if info="$(python3 -m sideloop.appletv profile "$prov")"; then
+    if info="$(python3 -m resigner.appletv profile "$prov")"; then
       save_probe "$info"
     else
       echo $(( $(now) + 7 * 86400 - 600 )) > "$EXPIRY"   # the profile wasn't kept; a free one lasts 7 days
     fi
     echo 0 > "$FAILS"
-    python3 -m sideloop.accounts record --app "$APP" --device "$DEVICE_UDID" --account "$ACCOUNT" || true
-    python3 -m sideloop.anisette good "$ANI" || true
+    python3 -m resigner.accounts record --app "$APP" --device "$DEVICE_UDID" --account "$ACCOUNT" || true
+    python3 -m resigner.anisette good "$ANI" || true
     if [[ "$PREVIOUS" != "$ACCOUNT" ]]; then
       log "NOTE signed with $APPLE_ID. If the Apple TV says the developer isn't trusted, trust it in Settings > General > Device Management"
     fi
@@ -246,9 +246,9 @@ for ACCOUNT in $CANDIDATES; do
 
   # Apple refusing because this account has used up its signings: another account can take a new app. An app that
   # is already installed has to stay with the account that signed it.
-  if (( rc != 0 )) && [[ -z "$PREVIOUS" || "$PREVIOUS" != "$ACCOUNT" ]] && python3 -m sideloop.accounts limit < "$out"; then
+  if (( rc != 0 )) && [[ -z "$PREVIOUS" || "$PREVIOUS" != "$ACCOUNT" ]] && python3 -m resigner.accounts limit < "$out"; then
     LIMIT_FOUND="$ACCOUNT"
-    python3 -m sideloop.accounts exhausted --account "$ACCOUNT" || true
+    python3 -m resigner.accounts exhausted --account "$ACCOUNT" || true
     if (( n_left > 0 )); then
       log "$APPLE_ID has no signings left ($(tr '\r' '\n' < "$out" | grep -iE 'maximum|limit|too many' | head -n1 | cut -c1-160)); trying the next Apple ID"
       continue
@@ -263,7 +263,7 @@ if (( rc == 0 )); then
   hint="plumesign finished, but didn't report a finished install"
 elif [[ -n "$LIMIT_FOUND" ]]; then
   hint="Apple says every available Apple ID is out of signings; add another one or wait (a free Apple ID allows 3 apps per device and 10 App IDs a week)"
-elif (( ! INTERACTIVE )) && python3 -m sideloop.anisette check < "$out" > /dev/null; then
+elif (( ! INTERACTIVE )) && python3 -m resigner.anisette check < "$out" > /dev/null; then
   hint="the sign-in helper (Anisette server) failed${ANI_SERVERS[1]:+ on every server}; try again in a few minutes, or list more servers in ANISETTE_SERVER"
 elif grep -qiE 'Enter 2FA code|code sent' "$out"; then
   hint="Apple is asking for a 2FA code; sign it in from the web UI once"

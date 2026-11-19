@@ -3,7 +3,7 @@ import time
 import unittest
 from pathlib import Path
 
-from sideloop import accounts, config, store
+from resigner import accounts, config, store
 
 from .support import UDID, UDID2, Fresh
 
