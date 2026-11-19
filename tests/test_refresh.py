@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from sideloop import accounts, config, store
+from sideloop import accounts, anisette, config, store
 
 from .support import ROOT, UDID, Fresh
 
@@ -41,13 +41,22 @@ class Refresh(Fresh):
     def behave(self, email, what):
         (self.stub / "behaviour" / email).write_text(what)
 
+    def servers_used(self):
+        try:
+            return (self.stub / "servers").read_text().split()
+        except FileNotFoundError:
+            return []
+
+    def bad_servers(self, *urls):
+        (self.stub / "badservers").write_text("\n".join(urls) + "\n")
+
     def calls(self):
         try:
             return [c.split("|") for c in (self.stub / "calls").read_text().splitlines()]
         except FileNotFoundError:
             return []
 
-    def run_refresh(self, app, *flags, tty=False):
+    def run_refresh(self, app, *flags, tty=False, servers=None):
         meta = store.app_meta(app)
         (self.stub / "installed").unlink(missing_ok=True)
         # what is installed on the (fake) device: whatever this app already was, signed by its account
@@ -58,6 +67,8 @@ class Refresh(Fresh):
                "DATA_DIR": config.DATA.as_posix(), "ALTSERVER_BIN": str(STUBS / "AltServer"),
                "STUB_DIR": str(self.stub), "STUB_UDID": UDID, "STUB_BUNDLE": meta["BUNDLE_ID"],
                "STUB_PKI": self.pki}
+        if servers:
+            env["ANISETTE_SERVER"] = servers
         cmd = ["bash", str(ROOT / "scripts" / "refresh.sh"), "--app", app, "--device", UDID, *flags]
         if tty:
             cmd = ["script", "-qec", " ".join(cmd), "/dev/null"]
@@ -193,6 +204,65 @@ class Refresh(Fresh):
         app = self.app()
         self.assertEqual(self.run_refresh(app, "--force").returncode, 0)
         self.assertIn("NOTE signed with a@example.com", self.lines())
+
+    # --- anisette servers ----------------------------------------------------------------------------------
+
+    A, B = "https://a.example", "https://b.example"
+
+    def test_a_failing_anisette_server_is_skipped_for_the_next_one(self):
+        app = self.app()
+        self.bad_servers(self.A)
+        r = self.run_refresh(app, "--force", servers=f"{self.A},{self.B}")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.servers_used(), [self.A, self.B])
+        self.assertEqual([c[0] for c in self.calls()], ["a@example.com", "a@example.com"])  # same Apple ID, new server
+        self.assertIn(f"Anisette server {self.A} failed", self.lines())
+        self.assertIn(f"trying {self.B}", self.lines())
+        self.assertEqual(anisette.last_good(), self.B)
+        self.assertTrue(anisette.is_bad(self.A))
+        self.assertEqual(accounts.pin_of(app, self.phone), self.a)
+
+    def test_the_server_that_worked_is_used_first_next_time(self):
+        app = self.app()
+        self.bad_servers(self.A)
+        self.assertEqual(self.run_refresh(app, "--force", servers=f"{self.A},{self.B}").returncode, 0)
+        (self.stub / "servers").unlink()
+        self.assertEqual(self.run_refresh(app, "--force", servers=f"{self.A},{self.B}").returncode, 0)
+        self.assertEqual(self.servers_used(), [self.B])
+
+    def test_every_server_failing_fails_the_run_without_touching_the_other_apple_id(self):
+        app = self.app()
+        self.bad_servers(self.A, self.B)
+        r = self.run_refresh(app, "--force", servers=f"{self.A} {self.B}")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(self.servers_used(), [self.A, self.B])
+        self.assertEqual([c[0] for c in self.calls()], ["a@example.com", "a@example.com"])
+        self.assertIn("failed on every server", self.lines())
+        self.assertTrue(anisette.is_bad(self.A) and anisette.is_bad(self.B))
+
+    def test_apple_id_problems_do_not_rotate_the_anisette_server(self):
+        app = self.app()
+        self.behave("a@example.com", "2fa")
+        r = self.run_refresh(app, "--force", servers=f"{self.A},{self.B}")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(self.servers_used(), [self.A])
+        self.assertFalse(anisette.is_bad(self.A))
+
+    def test_a_single_configured_server_is_just_tried_once(self):
+        app = self.app()
+        self.bad_servers(self.A)
+        r = self.run_refresh(app, "--force", servers=self.A)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(self.servers_used(), [self.A])
+        self.assertIn("the sign-in helper (Anisette server) failed;", self.lines())
+
+    def test_a_run_from_the_web_page_makes_one_attempt_and_leaves_the_retry_to_the_page(self):
+        app = self.app()
+        self.bad_servers(self.A)
+        r = self.run_refresh(app, "--force", tty=True, servers=f"{self.A},{self.B}")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(self.servers_used(), [self.A])
+        self.assertIn(f"via Anisette server {self.A}", r.stdout)
 
 
 if __name__ == "__main__":

@@ -524,7 +524,7 @@ function settingsView() {
     <div class="shead"><h3>Apple IDs</h3></div>
     <div class="list">
       ${accs.map((a, i) => `<div class="cell ind appcell">${tile(a.enabled ? "var(--green)" : "var(--gray)", "lock-closed")}<span class="k">${esc(a.apple_id)}
-          <span class="sub">${[i === 0 && a.enabled ? "First choice" : "", !a.verified ? "Not used yet" : a.exhausted ? "Out of signings for now" : plural(a.apps, "app"), a.app_ids_week ? `${a.app_ids_week} of 10 App IDs this week` : ""].filter(Boolean).join(" · ")}</span></span>
+          <span class="sub">${[i === 0 && a.enabled ? "First choice" : "", !a.verified ? "Not used yet" : a.exhausted ? "Out of signings for now" : a.per_device ? `${a.per_device} of 3 apps per device` : "No apps yet", a.app_ids_week ? `${a.app_ids_week} of 10 App IDs this week` : ""].filter(Boolean).join(" · ")}</span></span>
           <span class="tools">
             <button class="iconbtn blue" data-mv="up" data-acc="${esc(a.id)}" aria-label="Move up" ${i === 0 ? "disabled" : ""}>${ic("chevron-forward", 18, "up")}</button>
             <button class="iconbtn blue" data-mv="down" data-acc="${esc(a.id)}" aria-label="Move down" ${i === accs.length - 1 ? "disabled" : ""}>${ic("chevron-forward", 18, "down")}</button>

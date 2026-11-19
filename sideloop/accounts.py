@@ -179,6 +179,14 @@ def pinned(aid):
             if (s / "account").exists() and (s / "account").read_text().strip() == aid]
 
 
+def busiest_device(aid):
+    """The most apps this account has signed on one device: that is what Apple's 3-apps-per-device limit counts."""
+    per = {}
+    for _app, udid in pinned(aid):
+        per[udid] = per.get(udid, 0) + 1
+    return max(per.values(), default=0)
+
+
 def _ledger(aid):
     out = []
     try:
@@ -266,7 +274,7 @@ def view(aid, now=None):
     return {
         "id": aid, "apple_id": m["APPLE_ID"], "priority": int(m["PRIORITY"] or 0), "enabled": m["ENABLED"] == "1",
         "verified": (_dir(aid) / "verified").exists(), "exhausted": is_exhausted(aid, now),
-        "apps": len(pinned(aid)), "app_ids_week": app_ids_this_week(aid, now),
+        "apps": len(pinned(aid)), "per_device": busiest_device(aid), "app_ids_week": app_ids_this_week(aid, now),
     }
 
 

@@ -1,7 +1,9 @@
+import os
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from sideloop import accounts, config, store
+from sideloop import accounts, anisette, config, store
 from sideloop.jobs import Job, Jobs
 from sideloop.server import App, run_refresh
 
@@ -140,6 +142,50 @@ echo "maximum App ID limit"; exit 1'''
         script = f'''echo x >> "{counter}"; echo "signing with Apple ID a@example.com [{aid}]"
 echo "Something broke"; exit 1'''
         self.go(script)
+        self.assertEqual(len(counter.read_text().split()), 1)
+
+    # --- anisette servers: the web page retries a failed helper with the next server -------------------------
+
+    TWO = {"ANISETTE_SERVER": "https://a.example,https://b.example"}
+    FAILS = ('echo "signing and installing x, via Anisette server {url}"\n'
+             'echo "Alert: Anisette v3: /grandslam/MidService/finishMachineProvisioning answered HTTP 401."; exit 1')
+
+    def test_a_failing_anisette_server_is_set_aside_and_the_run_repeats(self):
+        marker = Path(config.DATA) / "ran"
+        script = f'''
+if [[ -e "{marker}" ]]; then echo "signing and installing x, via Anisette server https://b.example"; exit 0; fi
+touch "{marker}"
+{self.FAILS.format(url="https://a.example")}'''
+        with mock.patch.dict(os.environ, self.TWO):
+            job = self.go(script)
+        self.assertEqual(job.rc, 0)
+        self.assertTrue(anisette.is_bad("https://a.example"))
+        self.assertFalse(anisette.is_bad("https://b.example"))
+        self.assertTrue(any("Trying the next one" in line for line in job.lines))
+
+    def test_it_stops_when_every_anisette_server_has_failed(self):
+        counter = Path(config.DATA) / "count"
+        script = f'''echo x >> "{counter}"
+if [[ "$(wc -l < "{counter}")" == 1 ]]; then {self.FAILS.format(url="https://a.example")}; fi
+{self.FAILS.format(url="https://b.example")}'''
+        with mock.patch.dict(os.environ, self.TWO):
+            job = self.go(script)
+        self.assertNotEqual(job.rc, 0)
+        self.assertEqual(len(counter.read_text().split()), 2)
+        self.assertTrue(anisette.is_bad("https://a.example") and anisette.is_bad("https://b.example"))
+
+    def test_a_single_anisette_server_is_not_repeated(self):
+        counter = Path(config.DATA) / "count"
+        script = f'''echo x >> "{counter}"\n{self.FAILS.format(url="https://a.example")}'''
+        with mock.patch.dict(os.environ, {"ANISETTE_SERVER": "https://a.example"}):
+            self.go(script)
+        self.assertEqual(len(counter.read_text().split()), 1)
+
+    def test_untargeted_runs_do_not_repeat_for_a_failing_anisette_server(self):
+        counter = Path(config.DATA) / "count"
+        script = f'''echo x >> "{counter}"\n{self.FAILS.format(url="https://a.example")}'''
+        with mock.patch.dict(os.environ, self.TWO):
+            self.go(script, extra=())
         self.assertEqual(len(counter.read_text().split()), 1)
 
 

@@ -17,7 +17,7 @@ Install and automatically re-sign iPhone apps (IPAs) from your NAS, with a free 
 
 A free Apple ID can only sign apps for **7 days**. Sideloop runs on the NAS, signs the IPA with your Apple ID and installs it on the iPhone over your home Wi-Fi. A background check repeats this before the signature runs out, so the app keeps working and **keeps its data**.
 
-Signing needs an "anisette" helper (it makes your NAS look like a Mac to Apple). Since Apple's October 2026 changes the NAS provisions its own identity through a public anisette server; only that handshake goes through it, never your Apple ID or password.
+Signing needs an "anisette" helper (it makes your NAS look like a Mac to Apple). Since Apple's October 2026 changes the NAS provisions its own identity through a public anisette server; only that handshake goes through it, never your Apple ID or password. Three servers are listed in `ANISETTE_SERVER` and Sideloop moves on to the next one by itself when one of them fails.
 
 ## 1. Create the data folder
 

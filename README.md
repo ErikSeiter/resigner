@@ -34,7 +34,7 @@ A small self-hosted service with a web UI for any Linux machine (amd64 or arm64)
 - [x] Automatic re-signing when a device comes online, before the signature expires
 - [x] Web UI for pairing, uploading IPAs, 2FA codes and live progress
 - [x] Checks each IPA for FairPlay encryption, tweaks and app extensions
-- [x] Apple sign-in through any anisette v3 server: a public one, or your own [anisette-v3-server](https://github.com/Dadoum/anisette-v3-server)
+- [x] Apple sign-in through any anisette v3 server: public ones, or your own [anisette-v3-server](https://github.com/Dadoum/anisette-v3-server). `ANISETTE_SERVER` can list several; a failing server is set aside for 15 minutes and the next one is used
 - [x] Optional removal of app extensions so free Apple IDs can install apps that have them
 - [x] **Groups** of devices: tie an app to a group (for example "Family iPads") and it only goes to that group's devices; a new device only gets the apps that aren't tied to a group
 - [x] **Several Apple IDs** in a priority order: a new app is signed with the first Apple ID that still has room and the next one takes over when Apple says the limit is reached. An installed app always stays with the Apple ID that signed it
@@ -101,7 +101,7 @@ Pair the device in Finder and enable **Show this iPhone when on Wi-Fi**.
 - **Groups:** an app tied to one or more groups reaches exactly the devices in them. Deleting a group leaves its apps where they are; apps that followed no other group then go back to following new devices.
 - Trust the developer once in **Settings > General > VPN & Device Management**. Refreshes keep it trusted.
 - If Apple sign-in stops working, check for a newer tag at [jaakkopalvaila/AltServer-Linux](https://github.com/jaakkopalvaila/AltServer-Linux/tags) and update `ALTSERVER_TAG` in the `Dockerfile`. AltServer is built from that tag with the patches in `altserver/`. See [Troubleshooting](docs/TROUBLESHOOTING.md) for the error codes.
-- The anisette identity (a file that works like a password for this "device") is stored in `./data/xdg`. Don't share it.
+- The anisette identity (a file that works like a password for this "device") is stored in `./data/xdg`, one per server. Don't share it.
 
 Data is stored in `./data`.
 

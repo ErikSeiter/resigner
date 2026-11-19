@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 # Stands in for AltServer in tests/test_refresh.py. What it does for an Apple ID is the first word of
-# $STUB_DIR/behaviour/<email>: ok, limit, 2fa, fail (default: ok).
+# $STUB_DIR/behaviour/<email>: ok, limit, 2fa, fail (default: ok). A server listed in $STUB_DIR/badservers fails
+# the way a public anisette server does when its provisioning is rejected.
 while (( $# > 1 )); do
   case "$1" in -a) email="$2"; shift ;; -u) udid="$2"; shift ;; -p) ;; esac
   shift
 done
 echo "$email|$PWD|$HOME" >> "$STUB_DIR/calls"
+echo "$ALTSERVER_ANISETTE_SERVER" >> "$STUB_DIR/servers"
+if grep -qxF "$ALTSERVER_ANISETTE_SERVER" "$STUB_DIR/badservers" 2>/dev/null; then
+  echo "Anisette server $ALTSERVER_ANISETTE_SERVER: using v3 (auto)."
+  echo "Anisette v3: /grandslam/MidService/finishMachineProvisioning answered HTTP 401."
+  echo "Alert: Anisette v3: /grandslam/MidService/finishMachineProvisioning answered HTTP 401."
+  exit 1
+fi
 what="$(head -c 20 "$STUB_DIR/behaviour/$email" 2>/dev/null)"; what="${what:-ok}"
 case "$what" in
   ok)    echo "Signing Progress: 0.5"; echo "Installation Progress: 1.0"; echo "$email" > "$STUB_DIR/installed" ;;

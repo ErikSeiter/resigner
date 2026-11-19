@@ -63,7 +63,9 @@ FAILS="$APP_STATE/consecutive_failures"
 LOG_FILE="$STATE_DIR/refresh.log"
 NOISE='^(Signing|Installation) Progress:|^Writing File: |^Signing: |^(Data|Value) ?: |^X-(Apple|Mme|MMe)-|^(MachineID|One-Time Password|Local User ID|Device UDID|Device Description|Date|Sanitized client info) ?:|^Byte:|^(HMAC_OUT|NP):|anisette|^Received (auth )?response status code'
 
-export ALTSERVER_ANISETTE_SERVER="$ANISETTE_SERVER"
+# Anisette servers to try (ANISETTE_SERVER may list several): the one that worked last comes first.
+mapfile -t ANI_SERVERS < <(ANISETTE_SERVER="$ANISETTE_SERVER" python3 -m sideloop.anisette order 2>/dev/null)
+(( ${#ANI_SERVERS[@]} )) || ANI_SERVERS=("${ANISETTE_SERVER%%[, ]*}")
 # Stock AltServer removes every free provisioning profile on the device before installing. Once the
 # last profile of a developer is gone iOS forgets that the user trusted it, so every refresh brought
 # back "Untrusted Developer". The patched AltServer leaves them in place, and prune_profiles below
@@ -298,24 +300,40 @@ for ACCOUNT in $CANDIDATES; do
   { IFS= read -r -d '' APPLE_ID; IFS= read -r -d '' APPLE_PASSWORD; IFS= read -r -d '' ACC_WORK; IFS= read -r -d '' ACC_HOME; } \
     < <(set -a; . "$ACCOUNTS_DIR/$ACCOUNT/account.env"; printf '%s\0%s\0%s\0%s\0' "$APPLE_ID" "$APPLE_PASSWORD" "$WORK_DIR" "$HOME_DIR")
   mkdir -p "$ACC_WORK" "$ACC_HOME"
-  : > "$out"
 
   log "signing with Apple ID $APPLE_ID [$ACCOUNT]"
-  log "signing and installing $(basename "$IPA_PATH") on $DEVICE_UDID"
-  set +e
-  if (( INTERACTIVE )); then
-    run_altserver timeout --foreground 2400 "$ALTSERVER_BIN" -u "$DEVICE_UDID" -a "$APPLE_ID" -p "$APPLE_PASSWORD" "$IPA_PATH"
-    rc=$?
-  else
-    run_altserver timeout 2400 "$ALTSERVER_BIN" -u "$DEVICE_UDID" -a "$APPLE_ID" -p "$APPLE_PASSWORD" "$IPA_PATH" </dev/null 2>&1 \
-      | tee "$out"
-    rc=${PIPESTATUS[0]}
-    tr '\r' '\n' < "$out" | grep -vE "$NOISE" | cut -c1-400 >> "$LOG_FILE"
-  fi
-  set -e
+  n_ani=${#ANI_SERVERS[@]}
+  (( INTERACTIVE )) && n_ani=1   # on the web page a failed helper is retried by the page itself, with the next server
+  for (( si = 0; si < n_ani; si++ )); do
+    ANI="${ANI_SERVERS[si]}"
+    export ALTSERVER_ANISETTE_SERVER="$ANI"
+    : > "$out"
+    log "signing and installing $(basename "$IPA_PATH") on $DEVICE_UDID, via Anisette server $ANI"
+    set +e
+    if (( INTERACTIVE )); then
+      run_altserver timeout --foreground 2400 "$ALTSERVER_BIN" -u "$DEVICE_UDID" -a "$APPLE_ID" -p "$APPLE_PASSWORD" "$IPA_PATH"
+      rc=$?
+    else
+      run_altserver timeout 2400 "$ALTSERVER_BIN" -u "$DEVICE_UDID" -a "$APPLE_ID" -p "$APPLE_PASSWORD" "$IPA_PATH" </dev/null 2>&1 \
+        | tee "$out"
+      rc=${PIPESTATUS[0]}
+      tr '\r' '\n' < "$out" | grep -vE "$NOISE" | cut -c1-400 >> "$LOG_FILE"
+    fi
+    set -e
+    # A problem with the anisette server itself (not with the Apple ID): set it aside and try the next one.
+    if (( rc != 0 && ! INTERACTIVE )) && problem="$(python3 -m sideloop.anisette check < "$out")"; then
+      python3 -m sideloop.anisette bad "$ANI" || true
+      if (( si + 1 < n_ani )); then
+        log "Anisette server $ANI failed ($problem); trying ${ANI_SERVERS[si + 1]}"
+        continue
+      fi
+    fi
+    break
+  done
 
   if (( rc == 0 )) && stamp_success; then
     python3 -m sideloop.accounts record --app "$APP" --device "$DEVICE_UDID" --account "$ACCOUNT" || true
+    python3 -m sideloop.anisette good "$ANI" || true
     msg="refreshed, valid until $(fmt_epoch "$(cat "$EXPIRY")")"
     if [[ "$PREVIOUS" != "$ACCOUNT" ]]; then
       log "NOTE signed with $APPLE_ID. If iOS says Untrusted Developer, trust it in Settings > General > VPN & Device Management"
@@ -345,6 +363,8 @@ if (( rc == 0 )); then
   hint="AltServer finished, but the app isn't on the device (did it lock or leave Wi-Fi mid-copy?)"
 elif [[ -n "$LIMIT_FOUND" ]]; then
   hint="Apple says every available Apple ID is out of signings; add another one or wait (a free Apple ID allows 3 apps per device and 10 App IDs a week)"
+elif (( ! INTERACTIVE )) && python3 -m sideloop.anisette check < "$out" > /dev/null; then
+  hint="the sign-in helper (Anisette server) failed${ANI_SERVERS[1]:+ on every server}; try again in a few minutes, or list more servers in ANISETTE_SERVER"
 elif grep -qiE 'two.?factor code|verification code' "$out"; then
   hint="Apple is asking for a 2FA code; sign it from the web UI once"
 elif (( rc == 124 )); then

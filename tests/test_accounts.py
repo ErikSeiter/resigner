@@ -64,6 +64,19 @@ class Accounts(Fresh):
         self.assertIn(other, accounts.ids())
 
 
+    def test_the_busiest_device_is_what_the_three_apps_limit_counts(self):
+        a = accounts.save("a@example.com", "pw")
+        self.device(UDID)
+        self.device(UDID2, "iPad")
+        one, two = self.app("com.one", "One"), self.app("com.two", "Two")
+        self.assertEqual(accounts.busiest_device(a), 0)
+        accounts.record(one, UDID, a)
+        accounts.record(one, UDID2, a)  # the same app on a second device is not a second app on either
+        self.assertEqual((accounts.busiest_device(a), accounts.view(a)["per_device"]), (1, 1))
+        accounts.record(two, UDID, a)
+        self.assertEqual(accounts.view(a)["per_device"], 2)
+
+
 class Picking(Fresh):
     def setUp(self):
         super().setUp()

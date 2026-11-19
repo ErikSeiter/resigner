@@ -6,7 +6,7 @@ import time
 import urllib.parse
 from pathlib import Path
 
-from . import accounts, auth, config, ipa, pairing, store
+from . import accounts, anisette, auth, config, ipa, pairing, store
 from .config import LIFETIME_DAYS, MUX, PENDING_IPA, STATE
 from .jobs import redact, run_capture, run_pty
 from .watcher import configured
@@ -21,18 +21,32 @@ MAX_IPA = 4 * 1024 ** 3
 SIGNED_WITH = re.compile(r"signing with Apple ID .*\[([^\]]+)\]")
 
 
+ANISETTE_USED = re.compile(r"via Anisette server (\S+)")
+
+
 def run_refresh(job, argv):
-    """Runs refresh.sh on a terminal so a 2FA code can be typed in. If one specific app fails because Apple says the
-    account that was picked is out of signings, that account is set aside and the next one gets a go."""
+    """Runs refresh.sh on a terminal so a 2FA code can be typed in. If one specific app fails and the reason is
+    the anisette server, that server is set aside and the next one gets a go. If Apple says the account that was
+    picked is out of signings, that account is set aside and the next one gets a go."""
     targeted = "--app" in argv and "--device" in argv
     tried = set()
-    for _ in range(max(1, len(accounts.ids()))):
+    helpers = 0
+    for _ in range(max(1, len(accounts.ids())) + len(anisette.servers())):
         start = len(job.lines)
         run_pty(job, argv)
         text = "\n".join(job.lines[start:])
+        if job.rc == 0 or job.cancelled or not targeted:
+            return
+        server = (ANISETTE_USED.findall(text) or [""])[-1]
+        if server and anisette.failed(text):
+            anisette.bad(server)
+            if helpers + 1 < len(anisette.servers()):
+                helpers += 1
+                job.say("The sign-in helper server failed. Trying the next one…")
+                continue
+            return
         used = SIGNED_WITH.findall(text)
-        if (not targeted or job.rc == 0 or job.cancelled or not used or used[-1] in tried
-                or not accounts.LIMIT_RE.search(text)):
+        if not used or used[-1] in tried or not accounts.LIMIT_RE.search(text):
             return
         tried.add(used[-1])
         accounts.mark_exhausted(used[-1])

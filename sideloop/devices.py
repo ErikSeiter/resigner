@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from . import store
+from . import anisette, store
 from .config import ANISETTE, LOCKDOWN_DIR, USB_MUX
 from .log import log
 
@@ -83,13 +83,16 @@ def _mux_reachable():
 
 
 def _anisette_up():
-    try:
-        urllib.request.urlopen(ANISETTE, timeout=3).read(64)
-        return True
-    except urllib.error.HTTPError:
-        return True  # the server answered, just not with 200 (public servers often 404 on /)
-    except Exception:
-        return False
+    """True when at least one of the configured anisette servers answers."""
+    for url in anisette.servers(ANISETTE):
+        try:
+            urllib.request.urlopen(url, timeout=3).read(64)
+            return True
+        except urllib.error.HTTPError:
+            return True  # the server answered, just not with 200 (public servers often 404 on /)
+        except Exception:
+            continue
+    return False
 
 
 def _probe():

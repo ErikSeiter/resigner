@@ -7,7 +7,8 @@
 #   1. Data folder: /volume1/docker/sideloop-app/data  ("volume1" and the shared folder "docker"
 #      must exist on your NAS; change the three paths below if yours are different).
 #   2. TZ: set your time zone.
-#   3. ANISETTE_SERVER: leave the default unless the guide's troubleshooting page tells you otherwise.
+#   3. ANISETTE_SERVER: a comma separated list of public servers; the next one is tried when a server fails.
+#      Leave the default unless the guide's troubleshooting page tells you otherwise.
 #
 # Raspberry Pi / ARM NAS: replace "amd64" with "aarch64" in the builder image and
 # "x86_64" with "aarch64" in the netmuxd URL.
@@ -59,7 +60,7 @@ services:
     privileged: true          # needed to see the iPhone on the NAS's USB port
     environment:
       MUX: builtin
-      ANISETTE_SERVER: https://new.ani.sidestore.io
+      ANISETTE_SERVER: https://new.ani.sidestore.io,https://mac-ani.jkcoxson.com,https://ani3.stikstore.app
       XDG_CONFIG_HOME: /data/xdg   # keeps the anisette identity in the data folder
       TZ: Europe/Zurich
     volumes:
