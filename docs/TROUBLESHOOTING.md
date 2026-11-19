@@ -41,6 +41,17 @@ Apple TV signing is a separate path from the iPhone one (plumesign instead of Al
 | `skipped: an Apple TV only takes tvOS apps` / `a tvOS app can't go on an iPhone or iPad` | An app of the other kind was pointed at the device | Harmless. Sideloop only offers each app to devices that fit it |
 | The Apple TV asks to trust the developer, or the app disappears after a week | The signature ran out, or another Apple ID signed it | Check that **Automatic** is on and that the TV was on and awake on the network during the last days; press **Re-sign** to do it now |
 
+## Add from a link
+
+Pasting a link under **Add App…** makes the NAS download the file itself. The link has to be a direct download of the `.ipa` (a GitHub *release* page is not; its *asset* link is). Only `http(s)` links work.
+
+| You see | What it means | What to do |
+| --- | --- | --- |
+| `The server answered 404` (or 403) | The link is wrong, has expired or needs a login | Copy the download link again from the site |
+| `Couldn't reach the link: …` | The NAS can't reach that site (DNS, a firewall, no internet) | Check internet access from the NAS; open the link from another device to see if it works at all |
+| `not an IPA (an IPA is a zip file)` | The link gave something else, often a web page | Use the link of the `.ipa` file itself |
+| `That file is too large` | Over the 4 GB limit | Use a smaller build |
+
 ## Run AltServer by hand and see the real error
 
 The web UI hides most of AltServer's output. To see everything, open **Docker → Container → `sideloop` → Terminal → `/bin/bash`** and run (the UDID comes from `idevice_id -l`; replace `<bundle-id>`):

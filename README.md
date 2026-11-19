@@ -33,7 +33,7 @@ A small self-hosted service with a web UI for any Linux machine (amd64 or arm64)
 
 - [x] Multiple apps on multiple iPhones and iPads
 - [x] Automatic re-signing when a device comes online, before the signature expires
-- [x] Web UI for pairing, adding IPAs (upload or paste a link), 2FA codes and live progress
+- [x] Web UI for pairing, adding IPAs (upload them or paste a link and the server downloads the file), 2FA codes and live progress
 - [x] Checks each IPA for FairPlay encryption, tweaks and app extensions
 - [x] Apple sign-in through any anisette v3 server: public ones, or your own [anisette-v3-server](https://github.com/Dadoum/anisette-v3-server). `ANISETTE_SERVER` can list several; a failing server is set aside for 15 minutes and the next one is used
 - [x] Optional removal of app extensions so free Apple IDs can install apps that have them
@@ -50,9 +50,15 @@ A two-minute narrated walkthrough: setup, adding devices and apps, the first ins
 
 ## Screenshots
 
+Made with demo data: made-up devices and Apple IDs.
+
 | Login | Apps | Signing | Settings | Activity |
 | :---: | :---: | :---: | :---: | :---: |
 | <img src=".github/screenshots/login.png" width="160" /> | <img src=".github/screenshots/apps.png" width="160" /> | <img src=".github/screenshots/signing.png" width="160" /> | <img src=".github/screenshots/settings.png" width="160" /> | <img src=".github/screenshots/activity.png" width="160" /> |
+
+| Pair an Apple TV | Groups and apps |
+| :---: | :---: |
+| <img src=".github/screenshots/appletv.png" width="160" /> | <img src=".github/screenshots/groups.png" width="160" /> |
 
 ## Quick Start
 
@@ -100,7 +106,7 @@ An Apple TV with tvOS 17 or newer is not reached like an iPhone: it has no USB o
 1. Put the Apple TV and the machine running Sideloop on the **same network** (same subnet, no guest Wi-Fi, no client isolation). Sideloop has to run with `network_mode: host`, as in the compose files.
 2. On the Apple TV open **Settings > Remotes and Devices > Remote App and Devices**. It waits there and shows a PIN when something asks to pair.
 3. In Sideloop open **Settings**, press **Pair Apple TV…**, choose the TV in the list and type the PIN it shows when the page asks for it.
-4. Add a **tvOS** `.ipa` the usual way. Sideloop reads what the app's binary was built for (some tvOS builds claim iOS in their Info.plist), shows *Apple TV app* and only offers it to Apple TVs; iPhone apps are never offered to an Apple TV. A new Apple TV joins an empty group that only holds tvOS apps; otherwise it gets the tvOS apps that aren't tied to a group.
+4. Add a **tvOS** `.ipa` the usual way (upload it, or paste a link to it and the server downloads it). Sideloop reads what the app's binary was built for (some tvOS builds claim iOS in their Info.plist), shows *Apple TV app* and only offers it to Apple TVs; iPhone apps are never offered to an Apple TV. A new Apple TV joins an empty group that only holds tvOS apps; otherwise it gets the tvOS apps that aren't tied to a group.
 5. Press **Install** next to it. The first sign-in of an Apple ID for the Apple TV needs a 2FA code, entered on the web page (a free Apple ID is signed in separately for iOS and for tvOS, so an Apple ID that already works for your iPhone still asks once). After that the Apple TV is re-signed automatically when it is on and on the network.
 
 Limits and things to know:

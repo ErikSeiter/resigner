@@ -1,6 +1,6 @@
 # Sideloop on a UGREEN NAS (UGOS Pro)
 
-Install and automatically re-sign iPhone apps (IPAs) from your NAS, with a free Apple ID, and without a Mac or PC. Written and tested on a **UGREEN NASync DXP4800** running **UGOS Pro** with the Docker app. The same steps work on other x86 NAS systems that have a Docker GUI; only the menu names differ.
+Install and automatically re-sign iPhone, iPad and Apple TV apps (IPAs) from your NAS, with a free Apple ID, and without a Mac or PC. Written and tested on a **UGREEN NASync DXP4800** running **UGOS Pro** with the Docker app. The same steps work on other x86 NAS systems that have a Docker GUI; only the menu names differ.
 
 **Time:** about 30 minutes, most of it waiting for the first build.
 
@@ -11,6 +11,7 @@ Install and automatically re-sign iPhone apps (IPAs) from your NAS, with a free 
 | NAS | UGOS Pro with the **Docker** app installed (App Center). Intel/AMD CPU. For an ARM NAS see the note in [`nas/docker-compose.ugos.yml`](../nas/docker-compose.ugos.yml) |
 | Apple ID | A **free, throwaway** Apple ID with two-factor authentication on. Don't use your main one: its password is stored on the NAS (see [Security](#security)) |
 | iPhone / iPad | Plus a USB cable for the one-time pairing |
+| Apple TV (optional) | tvOS 17 or newer, on the same network as the NAS. No cable: it is paired with a PIN (section 10) |
 | IPA | An **unencrypted (decrypted)** `.ipa`. Apps straight from the App Store are FairPlay-encrypted and won't launch; Sideloop warns you about that when you add the file |
 
 ## How it works (60 seconds)
@@ -58,6 +59,8 @@ You can add **more than one** (Settings → Apple IDs). The first one that has r
 
 Settings → Groups lets you make sets of devices, for example *Family iPads*. Tie an app to a group (the chips under the app) and it only goes to that group's devices. Apps that aren't tied to a group go to every device, including ones you add later.
 
+<img src="../.github/screenshots/groups.png" width="220" alt="Groups and apps in Settings" />
+
 ## 6. Add an IPA
 
 Press **Add App…** and choose the `.ipa`, or paste a link to one under it and press **Get**: the NAS downloads the file itself (handy for GitHub releases and vendor downloads, and for files that are large to upload). Sideloop shows what it found (encryption, tweaks, extensions).
@@ -84,6 +87,8 @@ Leave **Automatic** on. Sideloop re-signs when less than the *Re-sign Early* tim
 
 While you are troubleshooting, **switch Automatic off**: every automatic attempt that reaches Apple can make your iPhone show an *Apple ID sign-in requested* prompt.
 
+<img src="../.github/screenshots/apps.png" width="220" alt="The Apps page: time left per app and device" />
+
 ## 10. Apple TV (optional)
 
 An Apple TV with **tvOS 17 or newer** can be kept signed the same way. It is paired differently from an iPhone (no cable, a PIN instead) and only takes **tvOS apps**; your iPhone and iPad apps are not touched by any of this.
@@ -93,6 +98,9 @@ An Apple TV with **tvOS 17 or newer** can be kept signed the same way. It is pai
 3. In Sideloop: **Settings → Pair Apple TV…**, pick the TV in the list, then type the **PIN** from the TV screen when the page asks for it.
 4. **Add App…** with a tvOS `.ipa`. The page says *Apple TV app* and offers it only to Apple TVs (it reads this from the app's binary, so a tvOS build that claims iOS in its Info.plist is still recognised). A new Apple TV joins an empty group that only holds tvOS apps; otherwise change its groups under Settings → Groups.
 5. Press **Install**. The first sign-in with an Apple ID on the Apple TV needs a 2FA code in the web page, even if that Apple ID already works for your iPhone. After that the Apple TV is re-signed by itself while it is on and awake on the network.
+6. If the Apple TV says the developer isn't trusted when you open the app, trust it in **Settings → General → Device Management**.
+
+<img src="../.github/screenshots/appletv.png" width="220" alt="Pairing an Apple TV: the PIN box" />
 
 **Good to know:** the free limits (3 apps per device, 10 App IDs a week) apply to the Apple TV too. A tvOS update can drop the pairing, so pair again if the TV stops showing up as *Connected*. Turning off *Automatically Update tvOS* (Settings → System → Software Updates) helps. If the page says the Apple TV helper isn't installed, the image was built without it (the download or its checksum check failed); redeploy the project to try again.
 
